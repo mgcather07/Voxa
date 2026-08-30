@@ -1,5 +1,8 @@
 # Voxa — Call Telemetry & Phone Refresh Planner
 
+> 📌 **Picking this up on another machine? Start with [HANDOFF.md](HANDOFF.md)** —
+> current status, exact setup steps, and what's next.
+
 **Voxa** is a read-only web app that pulls a live phone inventory out of Cisco Unified
 Communications Manager and turns it into a refresh plan: what you have, what
 it maps to, where each phone is physically plugged in, and what the swap does
