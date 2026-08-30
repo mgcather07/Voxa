@@ -1,14 +1,13 @@
 {% if phone %}
-<select class="inline"
-        name="swap_status"
-        hx-post="/phones/{{ phone.id }}/swap"
-        hx-target="#swap-{{ phone.id }}"
-        hx-swap="innerHTML"
-        hx-trigger="change">
-  {% for s in swap_statuses %}
-  <option value="{{ s }}" {{ 'selected' if phone.swap_status == s }}>
-    {{ s.replace('_', ' ') }}
-  </option>
-  {% endfor %}
-</select>
+{% set labels = {"not_started": "unplanned"} %}
+{% set idx = swap_statuses.index(phone.swap_status) if phone.swap_status in swap_statuses else 0 %}
+{% set next_status = swap_statuses[(idx + 1) % (swap_statuses | length)] %}
+<form class="swap-form"
+      hx-post="/phones/{{ phone.id }}/swap"
+      hx-target="#swap-{{ phone.id }}"
+      hx-swap="innerHTML">
+  <input type="hidden" name="swap_status" value="{{ next_status }}">
+  <button type="submit" class="swap-pill s-{{ phone.swap_status }}"
+          title="Click to advance swap status">{{ labels.get(phone.swap_status, phone.swap_status).replace('_', ' ') }}</button>
+</form>
 {% endif %}

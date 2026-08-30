@@ -5,17 +5,19 @@ from __future__ import annotations
 import csv
 import io
 import logging
+from datetime import timezone
 from pathlib import Path
 
-from fastapi import BackgroundTasks, Depends, FastAPI, Form, Request
+from fastapi import BackgroundTasks, Depends, FastAPI, Form, Query, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from sqlalchemy import desc, or_, select
+from sqlalchemy import desc, func, or_, select
 from sqlalchemy.orm import Session
 from starlette.middleware.sessions import SessionMiddleware
 
 from . import reports
+from .catalog import DEFAULT_FAMILY, FAMILIES
 from .auth import (
     RedirectToLogin,
     get_backend,
@@ -38,6 +40,27 @@ log = logging.getLogger("voxa")
 
 BASE_DIR = Path(__file__).resolve().parent
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
+
+
+def _timeago(value) -> str:
+    """Human 'x ago' for the top-bar collection status line."""
+    if value is None:
+        return "never"
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=timezone.utc)
+    seconds = (utcnow() - value).total_seconds()
+    if seconds < 45:
+        return "just now"
+    minutes = seconds / 60
+    if minutes < 60:
+        return f"{round(minutes)}m ago"
+    hours = minutes / 60
+    if hours < 24:
+        return f"{round(hours)}h ago"
+    return f"{round(hours / 24)}d ago"
+
+
+templates.env.filters["timeago"] = _timeago
 
 settings = get_settings()
 
@@ -77,12 +100,17 @@ def _latest_run(session: Session) -> SyncRun | None:
     ).first()
 
 
+def _fleet_total(session: Session) -> int:
+    return session.scalar(select(func.count()).select_from(Phone)) or 0
+
+
 def _ctx(request: Request, session: Session, user: User | None = None, **extra) -> dict:
     return {
         "request": request,
         "latest_run": _latest_run(session),
         "settings": settings,
         "swap_statuses": SWAP_STATUSES,
+        "fleet_total": _fleet_total(session),
         "user": user,
         **extra,
     }
@@ -170,20 +198,21 @@ def dashboard(
 # ---------------------------------------------------------------------------
 # Phone list
 # ---------------------------------------------------------------------------
-def _filtered_phones(
-    session: Session,
-    q: str = "",
-    site: str = "",
-    model: str = "",
-    lifecycle: str = "",
-    status: str = "",
-    swap: str = "",
-    limit: int = 500,
-) -> list[Phone]:
-    stmt = select(Phone)
+ROW_CAP = 500
+
+
+def _phone_conditions(
+    q: str,
+    site: str,
+    model: str,
+    life: list[str],
+    status: str,
+    swap: str,
+) -> list:
+    conditions = []
     if q:
         needle = f"%{q.strip()}%"
-        stmt = stmt.where(
+        conditions.append(
             or_(
                 Phone.device_name.ilike(needle),
                 Phone.description.ilike(needle),
@@ -194,40 +223,43 @@ def _filtered_phones(
             )
         )
     if site:
-        stmt = stmt.where(Phone.site == site)
+        conditions.append(Phone.site == site)
     if model:
-        stmt = stmt.where(Phone.model_key == model)
-    if lifecycle:
-        stmt = stmt.where(Phone.lifecycle == lifecycle)
+        conditions.append(Phone.model_key == model)
+    if life:
+        conditions.append(Phone.lifecycle.in_(life))
     if status:
-        stmt = stmt.where(Phone.registration_status == status)
+        conditions.append(Phone.registration_status == status)
     if swap:
-        stmt = stmt.where(Phone.swap_status == swap)
-    stmt = stmt.order_by(Phone.site, Phone.device_name).limit(limit)
-    return list(session.scalars(stmt).all())
+        conditions.append(Phone.swap_status == swap)
+    return conditions
 
 
-def _filter_options(session: Session) -> dict:
+def _phone_results(
+    session: Session,
+    q: str = "",
+    site: str = "",
+    model: str = "",
+    life: list[str] | None = None,
+    status: str = "",
+    swap: str = "",
+) -> dict:
+    """Capped rows plus the true (uncapped) match count for the header line."""
+    conditions = _phone_conditions(q, site, model, life or [], status, swap)
+
+    match_count = session.scalar(
+        select(func.count()).select_from(Phone).where(*conditions)
+    ) or 0
+
+    stmt = select(Phone).where(*conditions)
+    stmt = stmt.order_by(Phone.site, Phone.device_name).limit(ROW_CAP)
+    phones = list(session.scalars(stmt).all())
+
     return {
-        "all_sites": sorted(
-            {s for s in session.scalars(select(Phone.site).distinct()).all() if s}
-        ),
-        "all_models": sorted(
-            {
-                m
-                for m in session.scalars(select(Phone.model_key).distinct()).all()
-                if m
-            }
-        ),
-        "all_statuses": sorted(
-            {
-                s
-                for s in session.scalars(
-                    select(Phone.registration_status).distinct()
-                ).all()
-                if s
-            }
-        ),
+        "phones": phones,
+        "match_count": match_count,
+        "total": _fleet_total(session),
+        "shown": len(phones),
     }
 
 
@@ -237,29 +269,28 @@ def phones_page(
     q: str = "",
     site: str = "",
     model: str = "",
-    lifecycle: str = "",
+    life: list[str] = Query(default=[]),
     status: str = "",
     swap: str = "",
     session: Session = Depends(get_session),
     user: User = Depends(require_user),
 ):
-    phones = _filtered_phones(session, q, site, model, lifecycle, status, swap)
+    result = _phone_results(session, q, site, model, life, status, swap)
     return templates.TemplateResponse(
         "phones.html",
         _ctx(
             request,
             session,
             user,
-            phones=phones,
             filters={
                 "q": q,
                 "site": site,
                 "model": model,
-                "lifecycle": lifecycle,
+                "life": life,
                 "status": status,
                 "swap": swap,
             },
-            **_filter_options(session),
+            **result,
         ),
     )
 
@@ -270,17 +301,17 @@ def phones_rows(
     q: str = "",
     site: str = "",
     model: str = "",
-    lifecycle: str = "",
+    life: list[str] = Query(default=[]),
     status: str = "",
     swap: str = "",
     session: Session = Depends(get_session),
     user: User = Depends(require_user),
 ):
-    """HTMX partial - just the table body."""
-    phones = _filtered_phones(session, q, site, model, lifecycle, status, swap)
+    """HTMX partial - the table body plus the out-of-band header counts."""
+    result = _phone_results(session, q, site, model, life, status, swap)
     return templates.TemplateResponse(
         "_phone_rows.html",
-        {"request": request, "phones": phones, "swap_statuses": SWAP_STATUSES},
+        {"request": request, "swap_statuses": SWAP_STATUSES, "oob": True, **result},
     )
 
 
@@ -305,52 +336,68 @@ def update_swap(
 # ---------------------------------------------------------------------------
 # Refresh plan and PoE
 # ---------------------------------------------------------------------------
+def _clean_family(family: str) -> str:
+    return family if family in FAMILIES else DEFAULT_FAMILY
+
+
 @app.get("/plan", response_class=HTMLResponse)
 def plan_page(
     request: Request,
+    family: str = DEFAULT_FAMILY,
     session: Session = Depends(get_session),
     user: User = Depends(require_user),
 ):
-    plan = reports.replacement_plan(session)
-    totals: dict[str, dict] = {}
-    for row in plan:
-        entry = totals.setdefault(
-            row["replacement_key"],
-            {"name": row["replacement_name"], "count": 0},
-        )
-        entry["count"] += row["count"]
+    family = _clean_family(family)
+    plan = reports.refresh_plan(session, family)
     return templates.TemplateResponse(
         "plan.html",
         _ctx(
             request,
             session,
             user,
+            family=family,
             plan=plan,
-            totals=sorted(
-                totals.items(), key=lambda kv: -kv[1]["count"]
-            ),
-            models=reports.by_model(session),
+            mapping=reports.mapping_in_use(session, family),
         ),
     )
+
+
+def _poe_context(session: Session, family: str) -> dict:
+    switches = reports.poe_by_switch(session, family)
+    total_current = round(sum(s["current_w"] for s in switches), 1)
+    total_future = round(sum(s["future_w"] for s in switches), 1)
+    delta = round(total_future - total_current, 1)
+    span = max(total_current, total_future) or 1
+    return {
+        "family": family,
+        "family_segments": FAMILIES,
+        "switches": switches,
+        "total_current": total_current,
+        "total_future": total_future,
+        "delta": delta,
+        "pct_change": round(100 * delta / total_current) if total_current else 0,
+        "total_ports": sum(s["ports"] for s in switches),
+        "now_width": round(100 * total_current / span),
+        "add_width": max(0, round(100 * delta / span)),
+    }
 
 
 @app.get("/poe", response_class=HTMLResponse)
 def poe_page(
     request: Request,
+    family: str = DEFAULT_FAMILY,
     session: Session = Depends(get_session),
     user: User = Depends(require_user),
 ):
-    switches = reports.poe_by_switch(session)
+    family = _clean_family(family)
+    context = _poe_context(session, family)
+    # The replacement-family segmented control swaps just the body via HTMX.
+    if request.headers.get("HX-Request"):
+        return templates.TemplateResponse(
+            "_poe_body.html", {"request": request, **context}
+        )
     return templates.TemplateResponse(
-        "poe.html",
-        _ctx(
-            request,
-            session,
-            user,
-            switches=switches,
-            total_current=round(sum(s["current_w"] for s in switches), 1),
-            total_future=round(sum(s["future_w"] for s in switches), 1),
-        ),
+        "poe.html", _ctx(request, session, user, **context)
     )
 
 

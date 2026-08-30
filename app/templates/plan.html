@@ -1,85 +1,90 @@
 {% extends "base.html" %}
-{% block title %}Refresh plan{% endblock %}
+{% block title %}Refresh plan &middot; {{ settings.app_name }}{% endblock %}
+{% block page_title %}Refresh plan{% endblock %}
 {% block content %}
 
-<div class="card">
-  <h2>What to buy</h2>
-  <p class="hint">
-    Every phone mapped to its recommended replacement, excluding anything you
-    marked <em>excluded</em>. This is the quantity line for a quote.
-  </p>
-  {% if not totals %}
-    <div class="empty">Nothing to plan yet — run a collection first.</div>
-  {% else %}
-  <div class="scroll">
-    <table>
-      <thead>
-        <tr><th>Replacement model</th><th class="num">Quantity</th></tr>
-      </thead>
-      <tbody>
-        {% for key, row in totals %}
-        <tr>
-          <td>{{ row.name or key }} <span class="muted mono">({{ key }})</span></td>
-          <td class="num"><strong>{{ row.count }}</strong></td>
-        </tr>
+{% if not mapping %}
+  <div class="card">
+    <div class="empty">
+      <h2>Nothing to plan yet</h2>
+      <p>Run a collection first, or seed mock data with
+        <code>python scripts/mock_data.py</code>.</p>
+    </div>
+  </div>
+{% else %}
+
+<div class="section">
+  <div class="grid plan-two">
+
+    <div class="card pad-lg">
+      <div class="card-head" style="flex-direction:column; gap:4px; align-items:flex-start">
+        <h2>What to buy</h2>
+        <span class="subhead">Every phone mapped to its replacement, excluding anything marked excluded. This is the quantity line for a quote.</span>
+      </div>
+      {% if not plan.totals %}
+        <div class="empty">Nothing to order under this family — every model is kept as-is.</div>
+      {% else %}
+        {% for r in plan.totals %}
+        <div class="buy-tile">
+          <div class="info">
+            <span class="name">{{ r.name }}</span>
+            <span class="spec">{{ r.key }} · class {{ r.poe_class }} · {{ "%.2f"|format(r.poe_watts) }} W</span>
+          </div>
+          <div class="qty"><b class="tnum">{{ r.count }}</b><span>units</span></div>
+        </div>
         {% endfor %}
-      </tbody>
-    </table>
-  </div>
-  {% endif %}
-</div>
+        <div class="buy-total">
+          <span class="uplabel">Total to order</span>
+          <span class="sum tnum">{{ plan.total_count }}</span>
+        </div>
+      {% endif %}
+    </div>
 
-<div class="grid two">
-  <div class="card">
-    <h2>By site</h2>
-    <p class="hint">Split the order per location, or phase the rollout site by site.</p>
-    <div class="scroll tall">
-      <table>
-        <thead>
-          <tr><th>Site</th><th>Replacement</th><th class="num">Qty</th></tr>
-        </thead>
-        <tbody>
-          {% for row in plan %}
-          <tr>
-            <td>{{ row.site }}</td>
-            <td>{{ row.replacement_name or row.replacement_key }}</td>
-            <td class="num">{{ row.count }}</td>
-          </tr>
-          {% else %}
-          <tr><td colspan="3" class="empty">No data.</td></tr>
-          {% endfor %}
-        </tbody>
-      </table>
+    <div class="card pad-lg">
+      <div class="card-head">
+        <h2>By site</h2>
+        <span class="subhead">phase the rollout, or split the quote</span>
+      </div>
+      {% for s in plan.sites %}
+      <div class="plan-site">
+        <div class="top">
+          <span class="name">{{ s.site }}</span>
+          <span class="total tnum">{{ s.total }}</span>
+        </div>
+        {% for l in s.lines %}
+        <div class="plan-line">
+          <span class="name">{{ l.name }}</span>
+          <div class="track"><span class="barc-{{ loop.index0 % 4 }}" style="width: {{ l.pct }}%"></span></div>
+          <span class="count tnum">{{ l.count }}</span>
+        </div>
+        {% endfor %}
+      </div>
+      {% endfor %}
     </div>
   </div>
 
-  <div class="card">
-    <h2>Mapping in use</h2>
-    <p class="hint">
-      Edit <code class="mono">config/models.yaml</code> to change any of these,
-      then reload the page.
-    </p>
-    <div class="scroll tall">
-      <table>
-        <thead>
-          <tr>
-            <th>Current model</th><th>Lifecycle</th>
-            <th class="num">Count</th><th>Becomes</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for m in models %}
-          <tr>
-            <td>{{ m.model_raw or m.model_key }}</td>
-            <td><span class="pill {{ m.lifecycle }}">{{ m.lifecycle }}</span></td>
-            <td class="num">{{ m.count }}</td>
-            <td class="muted">{{ m.replacement_name or "no change" }}</td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
+  <div class="card pad-lg">
+    <div class="card-head">
+      <h2>Mapping in use</h2>
+      <span class="subhead">edit config/models.yaml to change any of these</span>
+    </div>
+    <div class="map-grid">
+      {% for m in mapping %}
+      <div class="map-card">
+        <div class="left">
+          <span class="key">{{ m.key }}</span>
+          <span class="meta">{{ m.count }} in service · {{ m.spec }}</span>
+        </div>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="var(--ink-3)" aria-hidden="true"><path d="M13 5l7 7-7 7-1.4-1.4 4.6-4.6H4v-2h12.2l-4.6-4.6L13 5Z"/></svg>
+        <div class="right">
+          <span class="rep {{ 'none' if not m.replacement }}">{{ m.replacement or "no change" }}</span>
+          <span class="meta">{{ m.replacement_spec or "—" }}</span>
+        </div>
+      </div>
+      {% endfor %}
     </div>
   </div>
 </div>
 
+{% endif %}
 {% endblock %}

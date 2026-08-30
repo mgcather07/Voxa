@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 from sqlalchemy import case, func, select
 from sqlalchemy.orm import Session
 
-from .catalog import get_catalog
+from .catalog import DEFAULT_FAMILY, get_catalog
 from .models import Phone
 
 
@@ -117,6 +117,7 @@ def by_site(session: Session) -> list[dict]:
             Phone.site,
             func.count().label("total"),
             func.sum(case((Phone.lifecycle == "eol", 1), else_=0)).label("eol"),
+            func.sum(case((Phone.lifecycle == "eos", 1), else_=0)).label("eos"),
             func.sum(
                 case((Phone.registration_status == "Registered", 1), else_=0)
             ).label("registered"),
@@ -124,73 +125,159 @@ def by_site(session: Session) -> list[dict]:
         .group_by(Phone.site)
         .order_by(func.count().desc())
     ).all()
-    return [
-        {
-            "site": site or "(no device pool)",
-            "total": total,
-            "eol": int(eol or 0),
-            "registered": int(registered or 0),
-        }
-        for site, total, eol, registered in rows
-    ]
-
-
-def replacement_plan(session: Session) -> list[dict]:
-    """How many of each replacement model to buy, grouped by site."""
-    rows = session.execute(
-        select(
-            Phone.site,
-            Phone.replacement_key,
-            Phone.replacement_name,
-            func.count().label("count"),
+    out = []
+    for site, total, eol, eos, registered in rows:
+        eol = int(eol or 0)
+        eos = int(eos or 0)
+        out.append(
+            {
+                "site": site or "(no device pool)",
+                "total": total,
+                "eol": eol,
+                "eos": eos,
+                "current": max(total - eol - eos, 0),
+                "registered": int(registered or 0),
+                "reg_pct": round(100 * int(registered or 0) / total) if total else 0,
+            }
         )
-        .where(Phone.replacement_key.is_not(None))
+    return out
+
+
+def refresh_plan(session: Session, family: str = DEFAULT_FAMILY) -> dict:
+    """The quantity lines for a quote, under the chosen replacement family.
+
+    Returns ``{"totals": [...], "total_count": int, "sites": [...]}``. Totals
+    collapse across sites; sites carry the per-model breakdown for the bars.
+    Anything marked ``excluded`` is left out of the count.
+    """
+    rows = session.execute(
+        select(Phone.site, Phone.model_raw, func.count().label("count"))
         .where(Phone.swap_status != "excluded")
-        .group_by(Phone.site, Phone.replacement_key, Phone.replacement_name)
-        .order_by(Phone.site, func.count().desc())
+        .group_by(Phone.site, Phone.model_raw)
     ).all()
-    return [
-        {
-            "site": site or "(no device pool)",
-            "replacement_key": rep_key,
-            "replacement_name": rep_name,
-            "count": count,
-        }
-        for site, rep_key, rep_name, count in rows
-    ]
+
+    catalog = get_catalog()
+    totals: dict[str, dict] = {}
+    site_map: dict[str, dict[str, int]] = {}
+    for site, model_raw, count in rows:
+        choice = catalog.replacement_for(model_raw, family)
+        if choice is None:
+            continue
+        entry = totals.setdefault(
+            choice.key,
+            {
+                "key": choice.key,
+                "name": choice.name,
+                "poe_class": choice.poe_class,
+                "poe_watts": choice.poe_watts,
+                "count": 0,
+            },
+        )
+        entry["count"] += count
+        bucket = site_map.setdefault(site or "(no device pool)", {})
+        bucket[choice.key] = bucket.get(choice.key, 0) + count
+
+    totals_list = sorted(totals.values(), key=lambda r: -r["count"])
+    total_count = sum(t["count"] for t in totals_list)
+
+    sites = []
+    for site, bucket in site_map.items():
+        lines = sorted(
+            (
+                {"name": totals[key]["name"], "count": count}
+                for key, count in bucket.items()
+            ),
+            key=lambda r: -r["count"],
+        )
+        top = lines[0]["count"] if lines else 1
+        sites.append(
+            {
+                "site": site,
+                "total": sum(line["count"] for line in lines),
+                "lines": [
+                    {**line, "pct": round(100 * line["count"] / top) if top else 0}
+                    for line in lines
+                ],
+            }
+        )
+    sites.sort(key=lambda s: -s["total"])
+    return {"totals": totals_list, "total_count": total_count, "sites": sites}
 
 
-def poe_by_switch(session: Session) -> list[dict]:
+def mapping_in_use(session: Session, family: str = DEFAULT_FAMILY) -> list[dict]:
+    """Every model in service and what it maps to under the chosen family."""
+    catalog = get_catalog()
+    out = []
+    for row in by_model(session):
+        info = catalog.lookup(row["model_raw"])
+        choice = catalog.replacement_for(row["model_raw"], family)
+        out.append(
+            {
+                "key": row["model_raw"] or row["model_key"],
+                "count": row["count"],
+                "spec": f"class {info.poe_class} · {info.poe_watts:.2f} W",
+                "replacement": choice.name if choice else None,
+                "replacement_spec": choice.spec if choice else None,
+            }
+        )
+    return out
+
+
+def poe_by_switch(session: Session, family: str = DEFAULT_FAMILY) -> list[dict]:
     """Per-switch PoE budget: what phones draw today vs after the swap.
 
     Budget uses the IEEE class ceiling because that is what the switch
     reserves per port, which is the number that actually runs a closet out
-    of power.
+    of power. ``family`` selects the replacement programme; phones marked
+    ``excluded`` keep their current draw in the "after" figure.
     """
     rows = session.execute(
         select(
             Phone.switch_name,
             Phone.site,
+            Phone.model_raw,
+            Phone.swap_status,
             func.count().label("ports"),
             func.sum(func.coalesce(Phone.poe_watts, 0.0)).label("current_w"),
-            func.sum(
-                func.coalesce(Phone.replacement_poe_watts, Phone.poe_watts, 0.0)
-            ).label("future_w"),
         )
         .where(Phone.switch_name.is_not(None))
-        .group_by(Phone.switch_name, Phone.site)
-        .order_by(func.count().desc())
+        .group_by(
+            Phone.switch_name, Phone.site, Phone.model_raw, Phone.swap_status
+        )
     ).all()
 
-    out = []
-    for switch, site, ports, current_w, future_w in rows:
-        current = round(float(current_w or 0), 1)
-        future = round(float(future_w or 0), 1)
-        out.append(
+    catalog = get_catalog()
+    switches: dict[tuple, dict] = {}
+    for switch, site, model_raw, swap_status, ports, current_w in rows:
+        current_w = float(current_w or 0)
+        choice = catalog.replacement_for(model_raw, family)
+        if choice is not None and swap_status != "excluded":
+            future_w = ports * choice.poe_watts
+        else:
+            future_w = current_w
+        entry = switches.setdefault(
+            (switch, site),
             {
                 "switch_name": switch,
                 "site": site or "-",
-                "ports": ports,
+                "ports": 0,
+                "current_w": 0.0,
+                "future_w": 0.0,
+            },
+        )
+        entry["ports"] += ports
+        entry["current_w"] += current_w
+        entry["future_w"] += future_w
+
+    out = []
+    for entry in switches.values():
+        current = round(entry["current_w"], 1)
+        future = round(entry["future_w"], 1)
+        out.append(
+            {
+                "switch_name": entry["switch_name"],
+                "site": entry["site"],
+                "ports": entry["ports"],
                 "current_w": current,
                 "future_w": future,
                 "delta_w": round(future - current, 1),
@@ -199,6 +286,7 @@ def poe_by_switch(session: Session) -> list[dict]:
                 ),
             }
         )
+    out.sort(key=lambda r: -r["ports"])
     return out
 
 

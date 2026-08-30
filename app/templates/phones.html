@@ -1,74 +1,36 @@
 {% extends "base.html" %}
-{% block title %}Phones{% endblock %}
+{% block title %}Phone inventory &middot; {{ settings.app_name }}{% endblock %}
+{% block page_title %}Phone inventory{% endblock %}
 {% block content %}
 
-<div class="card">
-  <h2>Phone inventory</h2>
-  <p class="hint">
-    Live from CUCM. Serial number and switch port come from the phone itself,
-    so they are only present where web access is enabled and the phone was
-    reachable. Showing up to 500 matches.
-  </p>
+{% set match_line = (total ~ " phones") if match_count == total else (match_count ~ " of " ~ total ~ " match") %}
 
+<div class="card">
   <form class="filters"
         hx-get="/phones/rows"
         hx-target="#rows"
-        hx-trigger="input changed delay:300ms from:find input, change from:find select"
-        hx-swap="innerHTML">
-    <div class="field">
-      <label for="q">Search</label>
-      <input type="search" id="q" name="q" value="{{ filters.q }}"
-             placeholder="name, description, DN, IP, serial, switch">
+        hx-swap="innerHTML"
+        hx-trigger="input changed delay:300ms from:find input[type=search], change">
+    <label class="search">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="var(--ink-3)" aria-hidden="true"><path d="M10 2a8 8 0 1 0 4.9 14.3l5.4 5.4 1.4-1.4-5.4-5.4A8 8 0 0 0 10 2Zm0 2a6 6 0 1 1 0 12 6 6 0 0 1 0-12Z"/></svg>
+      <input type="search" name="q" value="{{ filters.q }}"
+             placeholder="name, description, DN, IP, serial, switch"
+             autocomplete="off">
+    </label>
+    <div class="chips">
+      <label class="chip eol"><input type="checkbox" name="life" value="eol" {{ 'checked' if 'eol' in filters.life }}>Past support</label>
+      <label class="chip eos"><input type="checkbox" name="life" value="eos" {{ 'checked' if 'eos' in filters.life }}>End of sale</label>
+      <label class="chip current"><input type="checkbox" name="life" value="current" {{ 'checked' if 'current' in filters.life }}>Current</label>
     </div>
-    <div class="field">
-      <label for="site">Site</label>
-      <select id="site" name="site">
-        <option value="">All</option>
-        {% for s in all_sites %}
-        <option value="{{ s }}" {{ 'selected' if filters.site == s }}>{{ s }}</option>
-        {% endfor %}
-      </select>
-    </div>
-    <div class="field">
-      <label for="model">Model</label>
-      <select id="model" name="model">
-        <option value="">All</option>
-        {% for m in all_models %}
-        <option value="{{ m }}" {{ 'selected' if filters.model == m }}>{{ m }}</option>
-        {% endfor %}
-      </select>
-    </div>
-    <div class="field">
-      <label for="lifecycle">Lifecycle</label>
-      <select id="lifecycle" name="lifecycle">
-        <option value="">All</option>
-        {% for l in ["eol", "eos", "current", "unknown"] %}
-        <option value="{{ l }}" {{ 'selected' if filters.lifecycle == l }}>{{ l }}</option>
-        {% endfor %}
-      </select>
-    </div>
-    <div class="field">
-      <label for="status">Registration</label>
-      <select id="status" name="status">
-        <option value="">All</option>
-        {% for s in all_statuses %}
-        <option value="{{ s }}" {{ 'selected' if filters.status == s }}>{{ s }}</option>
-        {% endfor %}
-      </select>
-    </div>
-    <div class="field">
-      <label for="swap">Swap status</label>
-      <select id="swap" name="swap">
-        <option value="">All</option>
-        {% for s in swap_statuses %}
-        <option value="{{ s }}" {{ 'selected' if filters.swap == s }}>{{ s.replace('_', ' ') }}</option>
-        {% endfor %}
-      </select>
-    </div>
+    {% if filters.site %}<input type="hidden" name="site" value="{{ filters.site }}">{% endif %}
+    {% if filters.model %}<input type="hidden" name="model" value="{{ filters.model }}">{% endif %}
+    {% if filters.status %}<input type="hidden" name="status" value="{{ filters.status }}">{% endif %}
+    {% if filters.swap %}<input type="hidden" name="swap" value="{{ filters.swap }}">{% endif %}
+    <div class="match tnum" id="match-count">{{ match_line }}</div>
   </form>
 
-  <div class="scroll tallest">
-    <table>
+  <div class="scrollbox phones">
+    <table class="grid-table">
       <thead>
         <tr>
           <th>Device</th>
@@ -89,6 +51,11 @@
         {% include "_phone_rows.html" %}
       </tbody>
     </table>
+  </div>
+
+  <div class="footnote">
+    <span>Serial and switch port come from the phone's own web server — blank where web access is disabled or the phone was unreachable.</span>
+    <span class="shown" id="shown-count">Showing {{ shown }} rows</span>
   </div>
 </div>
 

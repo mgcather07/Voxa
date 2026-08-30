@@ -1,0 +1,118 @@
+<div id="poe-body" class="section">
+
+  {% if not switches %}
+  <div class="card">
+    <div class="empty">
+      <h2>No switch data yet</h2>
+      <p>Switch and port come from each phone's CDP neighbour, which needs
+        <strong>Web Access = Enabled</strong> on the phone or its Common Phone
+        Profile, and network reachability from this machine to the phone subnets.</p>
+    </div>
+  </div>
+  {% else %}
+
+  {% set d = delta | round | int %}
+  <div class="grid poe-two">
+    <div class="poe-hero">
+      <div class="head">
+        <div class="titles">
+          <span class="uplabel">Reserved across phone ports</span>
+          <span class="sub">IEEE class ceilings — what the switch actually holds back per port.</span>
+        </div>
+        <div class="segmented">
+          {% for key, label in family_segments.items() %}
+          <a class="{{ 'on' if family == key }}"
+             href="/poe?family={{ key }}"
+             hx-get="/poe?family={{ key }}"
+             hx-target="#poe-body"
+             hx-swap="outerHTML">{{ label }}</a>
+          {% endfor %}
+        </div>
+      </div>
+
+      <div class="poe-compare">
+        <div class="col">
+          <span class="uplabel">Today</span>
+          <span class="hero-num tnum">{{ "{:,}".format(total_current | round | int) }} W</span>
+        </div>
+        <svg class="arrow" width="26" height="26" viewBox="0 0 24 24" fill="var(--ink-3)" aria-hidden="true"><path d="M13 5l7 7-7 7-1.4-1.4 4.6-4.6H4v-2h12.2l-4.6-4.6L13 5Z"/></svg>
+        <div class="col">
+          <span class="uplabel">After the swap</span>
+          <span class="hero-num tnum {{ 'up' if total_future > total_current }}">{{ "{:,}".format(total_future | round | int) }} W</span>
+        </div>
+        <div class="deltacol">
+          <span class="delta-pill {{ 'up' if d > 0 else 'down' }}">{{ "+" if d > 0 }}{{ "{:,}".format(d) }} W</span>
+          <span class="note">{% if total_current %}{{ "+" if pct_change > 0 }}{{ pct_change }}% on phone ports{% else %}no data{% endif %}</span>
+        </div>
+      </div>
+
+      <div class="poe-bar-wrap">
+        <div class="poe-bar">
+          <div class="now" style="width: {{ now_width }}%"></div>
+          <div class="add" style="width: {{ add_width }}%"></div>
+        </div>
+        <div class="poe-legend">
+          <span><i class="now"></i>Reserved today</span>
+          <span><i class="add"></i>Added by the swap</span>
+          <span class="ports">{{ total_ports }} phone ports across {{ switches | length }} switches</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <span class="uplabel">Class ceilings in play</span>
+      {% set classes = [(1, "3.84 W", 15), (2, "6.49 W", 25), (3, "12.95 W", 51), (4, "25.50 W", 100)] %}
+      {% for cls, watts, width in classes %}
+      <div class="class-row">
+        <span class="lbl">Class {{ cls }}</span>
+        <div class="track"><span class="class-{{ cls }}" style="width: {{ width }}%"></span></div>
+        <span class="w tnum">{{ watts }}</span>
+      </div>
+      {% endfor %}
+      <div class="class-note">Phone ports only. Access points and cameras draw from the same closet budget — compare against the switch's real available power.</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <h2>Per switch</h2>
+      <span class="subhead">discovered from each phone's CDP neighbour</span>
+    </div>
+    <div class="scrollbox switches">
+      <table class="grid-table">
+        <thead>
+          <tr>
+            <th>Switch</th>
+            <th>Site</th>
+            <th class="num">Phone ports</th>
+            <th class="num">Reserved now</th>
+            <th class="num">After swap</th>
+            <th class="num">Change</th>
+            <th style="width:190px">Growth</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for s in switches %}
+          {% set sd = s.delta_w | round | int %}
+          <tr>
+            <td class="device">{{ s.switch_name }}</td>
+            <td class="ink2">{{ s.site }}</td>
+            <td class="num">{{ s.ports }}</td>
+            <td class="num ink2">{{ s.current_w | round | int }} W</td>
+            <td class="num" style="font-weight:700">{{ s.future_w | round | int }} W</td>
+            <td class="num delta {{ 'up' if sd > 0 else 'down' if sd < 0 else 'zero' }}" style="font-weight:700">{{ "+" if sd > 0 }}{{ sd }} W</td>
+            <td>
+              <div class="growth">
+                <div class="track"><span class="{{ 'g-high' if s.pct_change > 40 else 'g-mid' if s.pct_change > 15 else 'g-low' }}" style="width: {{ [[s.pct_change, 0] | max, 100] | min }}%"></span></div>
+                <span class="pct">{{ "+" if s.pct_change > 0 }}{{ s.pct_change }}%</span>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  {% endif %}
+</div>

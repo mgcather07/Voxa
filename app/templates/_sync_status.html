@@ -1,31 +1,4 @@
-{% if not latest_run %}
-  <div class="banner idle">
-    No collection has run yet. Click <strong>Collect from CUCM</strong> to pull
-    the cluster inventory.
-  </div>
-{% elif latest_run.status == "running" %}
-  <div class="banner running">
-    <span class="spinner"></span>
-    <span>
-      Collection in progress &mdash; <strong>{{ latest_run.stage }}</strong>.
-      {{ latest_run.axl_count }} configured,
-      {{ latest_run.ris_count }} seen live,
-      {{ latest_run.web_count }} phones scraped.
-    </span>
-  </div>
-{% elif latest_run.status == "failed" %}
-  <div class="banner failed">
-    <span>
-      Last collection failed: {{ latest_run.error }}
-    </span>
-  </div>
-{% else %}
-  <div class="banner idle">
-    Last collected {{ latest_run.finished_at.strftime("%b %d %H:%M") }}
-    in {{ latest_run.duration_seconds }}s &mdash;
-    {{ latest_run.axl_count }} phones from AXL,
-    {{ latest_run.ris_count }} from RisPort,
-    {{ latest_run.web_count }} responded to web scrape
-    ({{ latest_run.created }} new, {{ latest_run.updated }} updated).
-  </div>
-{% endif %}
+{# Polled every 3s via #sync-poll (hx-swap="none"); updates three regions OOB. #}
+<div id="sync-status" hx-swap-oob="innerHTML">{% include "_syncline.html" %}</div>
+<div id="sync-actions" hx-swap-oob="innerHTML">{% include "_sync_actions.html" %}</div>
+<div id="sync-progress" hx-swap-oob="innerHTML">{% include "_sync_progress.html" %}</div>

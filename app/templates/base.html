@@ -5,49 +5,91 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}{{ settings.app_name }}{% endblock %}</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/htmx/1.9.12/htmx.min.js"></script>
+  <script>htmx.config.useTemplateFragments = true;</script>
   <link rel="stylesheet" href="/static/app.css">
 </head>
 <body>
-<header class="topbar">
-  <div class="wrap">
+{% set path = request.url.path %}
+<div class="shell">
+
+  <aside class="sidebar">
     <div class="brand">
-      <span class="dot"></span>
-      <strong>{{ settings.app_name }}</strong>
-      <span class="sub">Call Telemetry</span>
+      <div class="brand-mark">
+        <div class="bars"><i></i><i></i><i></i><i></i></div>
+      </div>
+      <div>
+        <div class="brand-name">{{ settings.app_name }}</div>
+        <div class="brand-sub">Call telemetry</div>
+      </div>
     </div>
-    <nav>
-      <a href="/" class="{{ 'on' if request.url.path == '/' }}">Dashboard</a>
-      <a href="/phones" class="{{ 'on' if request.url.path == '/phones' }}">Phones</a>
-      <a href="/plan" class="{{ 'on' if request.url.path == '/plan' }}">Refresh plan</a>
-      <a href="/poe" class="{{ 'on' if request.url.path == '/poe' }}">PoE budget</a>
-      <a href="/export.csv">Export CSV</a>
+
+    <nav class="nav">
+      <div class="nav-group">Fleet</div>
+      <a class="nav-item {{ 'on' if path == '/' }}" href="/">
+        <span class="bar"></span>Dashboard
+      </a>
+      <a class="nav-item {{ 'on' if path == '/phones' }}" href="/phones">
+        <span class="bar"></span>Phones
+        <span class="count tnum">{{ fleet_total }}</span>
+      </a>
+      <div class="nav-group">Project</div>
+      <a class="nav-item {{ 'on' if path == '/plan' }}" href="/plan">
+        <span class="bar"></span>Refresh plan
+      </a>
+      <a class="nav-item {{ 'on' if path == '/poe' }}" href="/poe">
+        <span class="bar"></span>PoE budget
+      </a>
     </nav>
-    <form method="post" action="/sync" class="sync-form">
-      <button type="submit" class="btn">Collect from CUCM</button>
-    </form>
-    {% if user %}
-    <div class="userchip">
-      <span>{{ user.display_name or user.username }}</span>
-      <a href="/logout">Sign out</a>
+
+    <div class="sidebar-foot">
+      <div class="readonly">
+        <div class="readonly-head">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="var(--green)" aria-hidden="true"><path d="M12 1.5 4 5v6.4c0 5 3.4 9.6 8 11.1 4.6-1.5 8-6.1 8-11.1V5l-8-3.5Zm-1 14.6-3.2-3.2 1.4-1.4L11 13.3l4.8-4.8 1.4 1.4-6.2 6.2Z"/></svg>
+          <span>Read only</span>
+        </div>
+        <div class="readonly-body">{{ settings.app_name }} never writes to CUCM. Every call is a read.</div>
+      </div>
+      {% if user %}
+      <div class="userrow">
+        <div class="avatar">{{ (user.display_name or user.username)[:2] | upper }}</div>
+        <div style="min-width:0">
+          <div class="name">{{ user.display_name or user.username }}</div>
+          <div class="role">{{ user.username }} · {{ 'admin' if user.is_admin else 'member' }}{% if not settings.auth_disabled %} · <a href="/logout">sign out</a>{% endif %}</div>
+        </div>
+      </div>
+      {% endif %}
     </div>
-    {% endif %}
-  </div>
-</header>
+  </aside>
 
-<div class="wrap main">
-  <div id="sync-status"
-       hx-get="/sync/status"
-       hx-trigger="load, every 3s"
-       hx-swap="innerHTML">
-    {% include "_sync_status.html" %}
-  </div>
+  <main class="main">
+    <header class="topbar">
+      <div class="topbar-title">
+        <h1>{% block page_title %}{{ settings.app_name }}{% endblock %}</h1>
+        <div class="syncline" id="sync-status">{% include "_syncline.html" %}</div>
+      </div>
+      <div class="topbar-actions">
+        <div class="cluster-pill">
+          <span class="host">{{ settings.cucm_host }}</span>
+          <span class="div">|</span>
+          <span class="svc">AXL · RIS · WEB</span>
+        </div>
+        <a class="btn btn-secondary" href="/export.csv">Export CSV</a>
+        <span id="sync-actions">{% include "_sync_actions.html" %}</span>
+      </div>
+      <div class="sync-progress" id="sync-progress">{% include "_sync_progress.html" %}</div>
+      <div id="sync-poll" hidden
+           hx-get="/sync/status" hx-trigger="load, every 3s" hx-swap="none"></div>
+    </header>
 
-  {% block content %}{% endblock %}
+    <div class="content">
+      {% block content %}{% endblock %}
+    </div>
+
+    <footer class="footer">
+      <span>Read-only against {{ settings.cucm_host }}</span>
+      <span>PoE figures use IEEE class ceilings &mdash; verify each model before ordering.</span>
+    </footer>
+  </main>
 </div>
-
-<footer class="wrap foot">
-  <span>Read-only against {{ settings.cucm_host }}</span>
-  <span>PoE figures use IEEE class ceilings &mdash; verify each model before ordering.</span>
-</footer>
 </body>
 </html>

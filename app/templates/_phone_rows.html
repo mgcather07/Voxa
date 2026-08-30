@@ -3,30 +3,34 @@
 {% endif %}
 {% for p in phones %}
 <tr>
-  <td class="mono">{{ p.device_name }}</td>
-  <td>{{ p.description or "" }}</td>
+  <td class="device">{{ p.device_name }}</td>
+  <td class="desc">{{ p.description or "" }}</td>
   <td class="mono">{{ p.directory_number or "" }}</td>
   <td>{{ p.model_raw or p.model_key or "—" }}</td>
   <td><span class="pill {{ p.lifecycle or 'unknown' }}">{{ p.lifecycle or "unknown" }}</span></td>
   <td>
     {% if p.registration_status == "Registered" %}
-      <span class="pill reg">reg</span>
-    {% elif p.registration_status in ("UnRegistered", "Unregistered", "Rejected") %}
-      <span class="pill unreg" title="{{ p.status_reason or '' }}">unreg</span>
+      <span class="reg"><span class="dot"></span>registered</span>
     {% else %}
-      <span class="pill other" title="{{ p.status_reason or '' }}">{{ p.registration_status or "?" }}</span>
+      <span class="reg down" title="{{ p.status_reason or '' }}"><span class="dot"></span>{{ (p.registration_status or "unknown") | lower }}</span>
     {% endif %}
   </td>
-  <td class="mono">{{ p.ip_address or "" }}</td>
-  <td class="mono">{{ p.serial_number or "" }}</td>
-  <td class="mono">
-    {% if p.switch_name %}{{ p.switch_name }}{% if p.switch_port %} / {{ p.switch_port }}{% endif %}
-    {% else %}<span class="muted">—</span>{% endif %}
+  <td class="mono ink2">{{ p.ip_address or "" }}</td>
+  <td class="serial {{ 'none' if not p.serial_number }}">{{ p.serial_number or "—" }}</td>
+  <td class="switch {{ 'none' if not p.switch_name }}">
+    {%- if p.switch_name -%}
+      {{ p.switch_name }}{% if p.switch_port %} · {{ p.switch_port }}{% endif %}
+    {%- else -%}not reachable{%- endif -%}
   </td>
-  <td class="num">{{ "%.1f"|format(p.poe_watts or 0) }}W</td>
-  <td class="muted">{{ p.replacement_name or "—" }}</td>
+  <td class="num">{{ "%.2f W"|format(p.poe_watts or 0) }}</td>
+  <td class="rep">{{ p.replacement_name or "no change" }}</td>
   <td id="swap-{{ p.id }}">
     {% with phone = p %}{% include "_swap_cell.html" %}{% endwith %}
   </td>
 </tr>
 {% endfor %}
+{% if oob %}
+{% set match_line = (total ~ " phones") if match_count == total else (match_count ~ " of " ~ total ~ " match") %}
+<div id="match-count" hx-swap-oob="true" class="match tnum">{{ match_line }}</div>
+<span id="shown-count" hx-swap-oob="true" class="shown">Showing {{ shown }} rows</span>
+{% endif %}

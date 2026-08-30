@@ -1,0 +1,5 @@
+{% if latest_run and latest_run.status == "running" %}
+{% set raw = (latest_run.web_count / latest_run.axl_count * 100) if latest_run.axl_count else 30 %}
+{% set pct = [[raw | round | int, 8] | max, 95] | min %}
+<div class="track"><div class="fill" style="width: {{ pct }}%"></div></div>
+{% endif %}
