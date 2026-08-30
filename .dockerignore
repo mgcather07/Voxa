@@ -1,0 +1,18 @@
+# The image needs only what the Dockerfile COPYs: app/, config/, scripts/ and
+# requirements.txt. Everything else is dev tooling, secrets, or local state and
+# must never enter the build context (it would bloat the image and risk baking
+# in a credential or the local database).
+#
+# Strategy: exclude everything, then re-include exactly what ships.
+
+*
+
+!app
+!config
+!scripts
+!requirements.txt
+
+# Re-exclude junk that could live under the re-included dirs.
+**/__pycache__
+**/*.py[cod]
+**/.DS_Store

@@ -1,0 +1,99 @@
+# Build and publish the Voxa image when a version tag is pushed.
+#
+#   git tag v1.4.0 && git push origin v1.4.0
+#
+# Produces three things for that version:
+#   1. an image pushed to GitHub Container Registry (ghcr.io) — for hosts that
+#      can pull from a registry
+#   2. an image tarball (voxa-image-<v>.tar.gz) — for the air-gapped
+#      `docker load` path, attached to the GitHub Release
+#   3. the source-free server deploy bundle (voxa-deploy-<v>.tar.gz)
+#
+# GitHub's runners are amd64, the same architecture as the vSphere prod server,
+# so a plain `docker build` here produces an image that runs there directly —
+# no buildx/QEMU cross-compile needed (that is only for building on Apple
+# Silicon). Releases no longer depend on any one laptop being online.
+
+name: release
+
+on:
+  push:
+    tags: ["v*.*.*"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to build (e.g. 1.4.0), no leading v"
+        required: true
+
+permissions:
+  contents: write   # create the Release and attach the tarballs
+  packages: write   # push the image to ghcr.io
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    env:
+      GHCR_IMAGE: ghcr.io/${{ github.repository_owner }}/voxa
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve version
+        id: v
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            V="${{ github.event.inputs.version }}"
+          else
+            V="${GITHUB_REF_NAME#v}"       # strip the leading v from the tag
+          fi
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+          echo "Building version $V"
+
+      - name: Log in to ghcr.io
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" \
+            | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+      - name: Build image
+        env:
+          V: ${{ steps.v.outputs.version }}
+        run: |
+          docker build \
+            --build-arg VOXA_VERSION="$V" \
+            -t "$GHCR_IMAGE:$V" -t "$GHCR_IMAGE:latest" \
+            .
+
+      - name: Push to ghcr.io
+        env:
+          V: ${{ steps.v.outputs.version }}
+        run: |
+          docker push "$GHCR_IMAGE:$V"
+          docker push "$GHCR_IMAGE:latest"
+
+      - name: Export image tarball (for docker load)
+        env:
+          V: ${{ steps.v.outputs.version }}
+        run: |
+          mkdir -p dist
+          # Also tag it plainly so the tarball loads as voxa:<v>, matching the
+          # Makefile's default naming and VOXA_IMAGE examples.
+          docker tag "$GHCR_IMAGE:$V" "voxa:$V"
+          docker save "voxa:$V" | gzip > "dist/voxa-image-$V.tar.gz"
+
+      - name: Build server deploy bundle (no source)
+        run: make bundle VERSION=${{ steps.v.outputs.version }}
+
+      - name: Upload workflow artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: voxa-${{ steps.v.outputs.version }}
+          path: dist/*.tar.gz
+          retention-days: 30
+
+      - name: Attach tarballs to the Release
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" dist/*.tar.gz \
+            --title "Voxa ${GITHUB_REF_NAME}" \
+            --generate-notes

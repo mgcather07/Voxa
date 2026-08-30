@@ -1,10 +1,17 @@
 # Production stack for a Linux VM on vSphere.
 #
-#   docker compose -f docker-compose.prod.yml up -d
+#   docker compose --env-file .env.prod -f docker-compose.prod.yml up -d
+#   (or just `make up`, which passes --env-file for you)
 #
-# Reads secrets from .env.prod in this directory. Nothing is published to the
-# host except nginx on 80/443 - Postgres and the app stay on the internal
-# bridge network.
+# This file runs a PRE-BUILT image; it does not build from source. The server
+# only needs this file, .env.prod, deploy/nginx.conf, deploy/certs/, and the
+# loaded image (`docker load`) or a registry it can pull from. Your application
+# source never has to be copied here. Build the image elsewhere with
+# `make image` and set VOXA_IMAGE in .env.prod to the tag you shipped.
+#
+# --env-file .env.prod is what feeds the ${...} values below (POSTGRES_*,
+# VOXA_IMAGE). Nothing is published to the host except nginx on 80/443 -
+# Postgres and the app stay on the internal bridge network.
 
 services:
   db:
@@ -24,8 +31,9 @@ services:
     networks: [internal]
 
   app:
-    build: .
-    image: voxa:latest
+    # Pre-built image, shipped to this host — no source, no build step here.
+    # Pin VOXA_IMAGE in .env.prod (e.g. voxa:1.4.0, or registry.corp/team/voxa:1.4.0).
+    image: ${VOXA_IMAGE:-voxa:latest}
     restart: unless-stopped
     env_file: .env.prod
     environment:

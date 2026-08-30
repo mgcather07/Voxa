@@ -16,6 +16,9 @@ deploy/certs/*
 *.sqlite3
 backups/
 
+# Build/ship artifacts (image tarballs, server deploy bundles)
+dist/
+
 # Editors / OS
 .DS_Store
 .idea/

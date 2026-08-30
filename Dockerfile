@@ -1,8 +1,18 @@
 FROM python:3.12-slim AS base
 
+# Stamped at build time (`make image` passes the git describe version). Baked in
+# as a label and env var so a running container can report exactly what it is.
+ARG VOXA_VERSION=dev
+
+LABEL org.opencontainers.image.title="Voxa" \
+      org.opencontainers.image.description="CUCM call telemetry and phone refresh planner (read-only)" \
+      org.opencontainers.image.version="${VOXA_VERSION}" \
+      org.opencontainers.image.source="https://github.com/mgcather07/Voxa"
+
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PIP_NO_CACHE_DIR=1
+    PIP_NO_CACHE_DIR=1 \
+    VOXA_VERSION=${VOXA_VERSION}
 
 WORKDIR /srv/app
 

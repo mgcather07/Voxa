@@ -4,6 +4,20 @@ The app is a normal Linux web service: a container stack behind nginx. Nothing
 about it is vSphere-specific — it needs a VM, a route to CUCM, and a route to
 the phone subnets.
 
+**The deployment model:** you build a container image on a machine you control,
+and ship only that image to the server. The server never receives the
+application source, a git checkout, or a build toolchain — it runs a sealed
+artifact. What lives on the server is just: the image, `docker-compose.prod.yml`,
+`.env.prod`, `deploy/nginx.conf`, and your TLS certs. `make bundle` packages the
+non-image half of that as a single source-free folder (`deploy/SERVER.md` is its
+quickstart).
+
+> A note on what this does and doesn't protect: a container image still contains
+> readable Python; someone with the image **and** root on the host could extract
+> it. The image gives you *operational* separation — the server runs an artifact,
+> not your repository — not secrecy from a host administrator. That is the right
+> and sufficient property for "don't hand IT my codebase to build and run."
+
 ---
 
 ## 1. VM specification
@@ -33,7 +47,8 @@ Outbound, from the VM:
 | CUCM publisher | TCP 8443 | AXL and RisPort |
 | Phone subnets | TCP 80 and 443 | serial number and CDP switch/port scrape |
 | DNS, NTP | usual | |
-| Package repos / registry | 443 | only for build and patching |
+| OS package repos | 443 | Docker/OS patching only |
+| Internal container registry | 443 | only if you pull the image instead of loading a tarball |
 
 Inbound, to the VM:
 
@@ -52,15 +67,46 @@ conversation.
 
 ---
 
-## 3. Install
+## 3. Build the image (on your build machine, not the VM)
+
+Do this on a machine with Docker that you control — not the prod server. On
+Apple Silicon, `make image` cross-compiles to the server's `linux/amd64` via
+buildx, so the image runs on the VM even though you built it on a Mac. (First
+cross-build on a Mac needs QEMU; Docker Desktop and Colima ship it. Override the
+interpreter/arch with `make image PLATFORM=linux/amd64`.)
 
 ```bash
-sudo apt update && sudo apt install -y docker.io docker-compose-v2 git make
-sudo usermod -aG docker $USER && newgrp docker
+make image                 # builds voxa:<git-version> for linux/amd64
+```
 
+Then get it to the VM. Two supported paths — pick one:
+
+**A. Tarball (no registry needed — the robust default for a locked-down VM).**
+
+```bash
+make image-save            # writes dist/voxa-image-<version>.tar.gz
+make bundle                # writes dist/voxa-deploy-<version>.tar.gz (no source)
+# copy both dist/*.tar.gz to the VM over your VPN (scp), then on the VM:
 sudo mkdir -p /opt/voxa && sudo chown $USER /opt/voxa
-git clone <your-repo-url> /opt/voxa
+tar xzf voxa-deploy-<version>.tar.gz -C /opt/voxa --strip-components=1
 cd /opt/voxa
+gunzip -c /path/to/voxa-image-<version>.tar.gz | docker load
+```
+
+**B. Internal registry (cleaner once you have one).**
+
+```bash
+make image-push REGISTRY=registry.corp.example.com/voice
+# on the VM (which needs the deploy bundle from `make bundle`):
+docker pull registry.corp.example.com/voice/voxa:<version>
+```
+
+Either way, set `VOXA_IMAGE` in `.env.prod` (next step) to the exact tag you
+shipped. The VM only needs Docker + the Compose plugin installed:
+
+```bash
+sudo apt update && sudo apt install -y docker.io docker-compose-v2
+sudo usermod -aG docker $USER && newgrp docker
 ```
 
 ## 4. Configure
@@ -108,11 +154,12 @@ openssl req -x509 -newkey rsa:2048 -nodes -days 397 \
 
 ## 6. Start
 
+`make` targets on the server pass `--env-file .env.prod` for you (Compose needs
+it for both the `${...}` values and the app's runtime env).
+
 ```bash
-make build
 make up
-docker compose -f docker-compose.prod.yml exec app \
-  python scripts/manage.py create-user yourname --admin
+make create-user NAME=yourname
 ```
 
 Browse to `https://<vm>/`, sign in, click **Collect from CUCM**.
@@ -121,7 +168,8 @@ If the collection fails, run the connectivity check inside the container — it
 names the missing CUCM role rather than making you guess:
 
 ```bash
-docker compose -f docker-compose.prod.yml exec app python scripts/test_cucm.py
+docker compose --env-file .env.prod -f docker-compose.prod.yml \
+  exec app python scripts/test_cucm.py
 ```
 
 ---
@@ -134,24 +182,27 @@ make backup      # gzipped pg_dump into ./backups
 make down        # stop
 ```
 
-**Upgrade:**
+**Upgrade** (you build a new image on your build machine and ship it as in
+step 3; the server never rebuilds):
 
 ```bash
 cd /opt/voxa
 make backup
-git pull
-make build && make up
+# load the new image tarball (or `docker pull` it from your registry):
+make image-load FILE=/path/to/voxa-image-<newversion>.tar.gz
+# bump VOXA_IMAGE to the new tag in .env.prod, then:
+make up
 ```
 
-Take a VM snapshot before an upgrade that changes the schema. The app creates
-tables it needs on startup but does not run migrations — see the note below.
+Rollback is the reverse: set `VOXA_IMAGE` back to the previous tag (still loaded
+on the host) and `make up`. Take a VM snapshot before an upgrade that changes the
+schema. The app creates tables it needs on startup but does not run migrations —
+see the note below.
 
 **Restore:**
 
 ```bash
-gunzip -c backups/voxa_YYYYMMDD_HHMMSS.sql.gz | \
-  docker compose -f docker-compose.prod.yml exec -T db \
-  psql -U voxa voxa
+make restore FILE=backups/voxa_YYYYMMDD_HHMMSS.sql.gz
 ```
 
 **Back up:** the Postgres volume and `.env.prod`. Everything else is in git.
@@ -192,10 +243,12 @@ nginx configured as a reverse proxy to `127.0.0.1:8000`. Same `.env.prod`.
 
 ## A note on the OVA question
 
-Call Telemetry ships as a VMware OVA, and it is reasonable to ask why this
-doesn't. An OVA makes sense for distributing to strangers who can't be asked
-to run `git clone`. For a tool your own team deploys to your own vSphere, a
-git checkout plus `make up` is faster to build, far easier to patch, and
-leaves the VM's OS lifecycle under your standard build process instead of
-inside an image you now maintain. Revisit only if this ends up deployed
-somewhere you don't administer.
+An **OVA** is a whole-VM image, and it is reasonable to ask why we don't ship
+one. An OVA makes sense for handing a black box to strangers who administer
+their own estate. Here you administer the VM, and the thing that actually needs
+to travel is the *app*, not an operating system — so we ship a **container
+image** onto a VM your team already patches and monitors. You still never copy
+source to the server (that was the whole point), but the VM's OS lifecycle stays
+under your standard build process instead of frozen inside an appliance you now
+own. Revisit the OVA only if this ends up deployed somewhere you don't
+administer.
