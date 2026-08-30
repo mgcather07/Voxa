@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sign in &middot; {{ settings.app_name }}</title>
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body class="login-page">
+  <div class="login-card">
+    <div class="brand" style="margin-bottom: 18px;">
+      <span class="dot"></span>
+      <strong>{{ settings.app_name }}</strong>
+    </div>
+
+    {% if error %}
+    <div class="banner failed" style="margin-bottom: 14px;">{{ error }}</div>
+    {% endif %}
+
+    <form method="post" action="/login">
+      <input type="hidden" name="next" value="{{ next }}">
+      <div class="field" style="margin-bottom: 12px;">
+        <label for="username">Username</label>
+        <input type="text" id="username" name="username"
+               autocomplete="username" autofocus required
+               style="width: 100%;">
+      </div>
+      <div class="field" style="margin-bottom: 18px;">
+        <label for="password">Password</label>
+        <input type="password" id="password" name="password"
+               autocomplete="current-password" required
+               style="width: 100%;">
+      </div>
+      <button type="submit" class="btn" style="width: 100%;">Sign in</button>
+    </form>
+
+    <p class="muted" style="font-size: 12px; margin: 18px 0 0;">
+      Read-only tooling for the Cisco phone refresh. Accounts are created by an
+      administrator.
+    </p>
+  </div>
+</body>
+</html>

@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}PoE budget{% endblock %}
+{% block content %}
+
+<div class="stats">
+  <div class="stat">
+    <div class="label">Switches seen</div>
+    <div class="value">{{ switches|length }}</div>
+    <div class="note">via CDP from the phones</div>
+  </div>
+  <div class="stat">
+    <div class="label">Reserved today</div>
+    <div class="value">{{ total_current }}W</div>
+    <div class="note">phone ports only</div>
+  </div>
+  <div class="stat {{ 'warn' if total_future > total_current }}">
+    <div class="label">After the swap</div>
+    <div class="value">{{ total_future }}W</div>
+    <div class="note">
+      {{ "+" if total_future >= total_current }}{{ (total_future - total_current)|round(1) }}W change
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <h2>PoE budget per switch</h2>
+  <p class="hint">
+    Watts are IEEE class ceilings, which is what a switch actually reserves per
+    port — the number that runs a closet out of power. Phone ports only; this
+    does not know about APs, cameras, or anything else drawing from the same
+    budget, so compare it against the switch's real available power before you
+    commit.
+  </p>
+
+  {% if not switches %}
+    <div class="empty">
+      No switch data yet. Switch and port come from each phone's CDP neighbour,
+      which needs <strong>Web Access = Enabled</strong> on the phone or its
+      Common Phone Profile, and network reachability from this machine to the
+      phone subnets.
+    </div>
+  {% else %}
+  <div class="scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>Switch</th><th>Site</th>
+          <th class="num">Phone ports</th>
+          <th class="num">Reserved now</th>
+          <th class="num">After swap</th>
+          <th class="num">Change</th>
+          <th style="width:160px">Growth</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for s in switches %}
+        <tr>
+          <td class="mono">{{ s.switch_name }}</td>
+          <td>{{ s.site }}</td>
+          <td class="num">{{ s.ports }}</td>
+          <td class="num">{{ s.current_w }}W</td>
+          <td class="num"><strong>{{ s.future_w }}W</strong></td>
+          <td class="num" style="color:{{ 'var(--danger)' if s.delta_w > 0 else 'var(--muted)' }}">
+            {{ "+" if s.delta_w > 0 }}{{ s.delta_w }}W
+          </td>
+          <td>
+            <div class="bar">
+              <span style="width: {{ [s.pct_change, 100]|min if s.pct_change > 0 else 0 }}%;
+                           background: {{ 'var(--danger)' if s.pct_change > 25 else 'var(--accent)' }}"></span>
+            </div>
+            <span class="muted" style="font-size:11.5px">{{ s.pct_change }}%</span>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+</div>
+
+{% endblock %}

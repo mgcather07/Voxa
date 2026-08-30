@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}{{ settings.app_name }}{% endblock %}</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/htmx/1.9.12/htmx.min.js"></script>
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="wrap">
+    <div class="brand">
+      <span class="dot"></span>
+      <strong>{{ settings.app_name }}</strong>
+      <span class="sub">CUCM refresh planner</span>
+    </div>
+    <nav>
+      <a href="/" class="{{ 'on' if request.url.path == '/' }}">Dashboard</a>
+      <a href="/phones" class="{{ 'on' if request.url.path == '/phones' }}">Phones</a>
+      <a href="/plan" class="{{ 'on' if request.url.path == '/plan' }}">Refresh plan</a>
+      <a href="/poe" class="{{ 'on' if request.url.path == '/poe' }}">PoE budget</a>
+      <a href="/export.csv">Export CSV</a>
+    </nav>
+    <form method="post" action="/sync" class="sync-form">
+      <button type="submit" class="btn">Collect from CUCM</button>
+    </form>
+    {% if user %}
+    <div class="userchip">
+      <span>{{ user.display_name or user.username }}</span>
+      <a href="/logout">Sign out</a>
+    </div>
+    {% endif %}
+  </div>
+</header>
+
+<div class="wrap main">
+  <div id="sync-status"
+       hx-get="/sync/status"
+       hx-trigger="load, every 3s"
+       hx-swap="innerHTML">
+    {% include "_sync_status.html" %}
+  </div>
+
+  {% block content %}{% endblock %}
+</div>
+
+<footer class="wrap foot">
+  <span>Read-only against {{ settings.cucm_host }}</span>
+  <span>PoE figures use IEEE class ceilings &mdash; verify each model before ordering.</span>
+</footer>
+</body>
+</html>

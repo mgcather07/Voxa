@@ -1,0 +1,35 @@
+# systemd unit for a VM where Docker is not approved.
+#
+#   sudo cp deploy/phone-inventory.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now phone-inventory
+#
+# Assumes the repo is at /opt/phone-inventory with a venv at .venv, owned by
+# a system user 'phoneinv', and Postgres installed on the VM.
+
+[Unit]
+Description=CUCM Phone Inventory
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=exec
+User=phoneinv
+Group=phoneinv
+WorkingDirectory=/opt/phone-inventory
+EnvironmentFile=/opt/phone-inventory/.env.prod
+ExecStart=/opt/phone-inventory/.venv/bin/uvicorn app.main:app \
+    --host 127.0.0.1 --port 8000 --workers 2 \
+    --proxy-headers --forwarded-allow-ips '*'
+Restart=on-failure
+RestartSec=5
+
+# The app writes nothing to disk; all state is in Postgres.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=
+
+[Install]
+WantedBy=multi-user.target

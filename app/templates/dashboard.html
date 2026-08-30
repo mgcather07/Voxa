@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+{% block content %}
+
+{% if summary.total == 0 %}
+  <div class="card empty">
+    <h2>No phones yet</h2>
+    <p class="hint">
+      Run a collection, or seed mock data with
+      <code class="mono">python scripts/mock_data.py</code> to explore the app
+      without touching CUCM.
+    </p>
+  </div>
+{% else %}
+
+<div class="stats">
+  <div class="stat">
+    <div class="label">Phones</div>
+    <div class="value">{{ summary.total }}</div>
+    <div class="note">{{ summary.models }} models across {{ summary.sites }} sites</div>
+  </div>
+  <div class="stat {{ 'alert' if summary.eol }}">
+    <div class="label">Past end of support</div>
+    <div class="value">{{ summary.eol }}</div>
+    <div class="note">replace first</div>
+  </div>
+  <div class="stat {{ 'warn' if summary.eos }}">
+    <div class="label">End of sale</div>
+    <div class="value">{{ summary.eos }}</div>
+    <div class="note">plan next cycle</div>
+  </div>
+  <div class="stat">
+    <div class="label">Registered</div>
+    <div class="value">{{ summary.registered }}</div>
+    <div class="note">{{ summary.unregistered }} not registered</div>
+  </div>
+  <div class="stat">
+    <div class="label">Serial captured</div>
+    <div class="value">{{ summary.serial_coverage }}%</div>
+    <div class="note">{{ summary.with_serial }} of {{ summary.total }}</div>
+  </div>
+  <div class="stat">
+    <div class="label">Switch port known</div>
+    <div class="value">{{ summary.port_coverage }}%</div>
+    <div class="note">{{ summary.with_switch_port }} of {{ summary.total }}</div>
+  </div>
+</div>
+
+{% if unverified %}
+<div class="warnbox">
+  <strong>Unverified catalog entries.</strong>
+  These models are in your cluster but their PoE class and lifecycle state in
+  <code class="mono">config/models.yaml</code> have not been fact-checked yet:
+  {{ unverified|join(", ") }}.
+  Confirm each against its Cisco data sheet and EoL bulletin, then set
+  <code class="mono">verified: true</code>.
+</div>
+{% endif %}
+
+<div class="grid two">
+  <div class="card">
+    <h2>Models in service</h2>
+    <p class="hint">What you have, and what each one maps to.</p>
+    <div class="scroll tall">
+      <table>
+        <thead>
+          <tr>
+            <th>Model</th><th>Lifecycle</th>
+            <th class="num">Count</th><th>Replacement</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for m in models %}
+          <tr>
+            <td>
+              <a href="/phones?model={{ m.model_key }}">{{ m.model_raw or m.model_key }}</a>
+              {% if not m.verified %}<span class="muted" title="Catalog entry unverified">*</span>{% endif %}
+            </td>
+            <td><span class="pill {{ m.lifecycle }}">{{ m.lifecycle }}</span></td>
+            <td class="num">{{ m.count }}</td>
+            <td class="muted">{{ m.replacement_name or "—" }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Sites</h2>
+    <p class="hint">Derived from the device pool name.</p>
+    <div class="scroll tall">
+      <table>
+        <thead>
+          <tr>
+            <th>Site</th><th class="num">Phones</th>
+            <th class="num">Past support</th><th class="num">Registered</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for s in sites %}
+          <tr>
+            <td><a href="/phones?site={{ s.site }}">{{ s.site }}</a></td>
+            <td class="num">{{ s.total }}</td>
+            <td class="num">
+              {% if s.eol %}<strong style="color:var(--danger)">{{ s.eol }}</strong>
+              {% else %}0{% endif %}
+            </td>
+            <td class="num">{{ s.registered }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+{% endif %}
+{% endblock %}

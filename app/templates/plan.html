@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% block title %}Refresh plan{% endblock %}
+{% block content %}
+
+<div class="card">
+  <h2>What to buy</h2>
+  <p class="hint">
+    Every phone mapped to its recommended replacement, excluding anything you
+    marked <em>excluded</em>. This is the quantity line for a quote.
+  </p>
+  {% if not totals %}
+    <div class="empty">Nothing to plan yet — run a collection first.</div>
+  {% else %}
+  <div class="scroll">
+    <table>
+      <thead>
+        <tr><th>Replacement model</th><th class="num">Quantity</th></tr>
+      </thead>
+      <tbody>
+        {% for key, row in totals %}
+        <tr>
+          <td>{{ row.name or key }} <span class="muted mono">({{ key }})</span></td>
+          <td class="num"><strong>{{ row.count }}</strong></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+</div>
+
+<div class="grid two">
+  <div class="card">
+    <h2>By site</h2>
+    <p class="hint">Split the order per location, or phase the rollout site by site.</p>
+    <div class="scroll tall">
+      <table>
+        <thead>
+          <tr><th>Site</th><th>Replacement</th><th class="num">Qty</th></tr>
+        </thead>
+        <tbody>
+          {% for row in plan %}
+          <tr>
+            <td>{{ row.site }}</td>
+            <td>{{ row.replacement_name or row.replacement_key }}</td>
+            <td class="num">{{ row.count }}</td>
+          </tr>
+          {% else %}
+          <tr><td colspan="3" class="empty">No data.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Mapping in use</h2>
+    <p class="hint">
+      Edit <code class="mono">config/models.yaml</code> to change any of these,
+      then reload the page.
+    </p>
+    <div class="scroll tall">
+      <table>
+        <thead>
+          <tr>
+            <th>Current model</th><th>Lifecycle</th>
+            <th class="num">Count</th><th>Becomes</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for m in models %}
+          <tr>
+            <td>{{ m.model_raw or m.model_key }}</td>
+            <td><span class="pill {{ m.lifecycle }}">{{ m.lifecycle }}</span></td>
+            <td class="num">{{ m.count }}</td>
+            <td class="muted">{{ m.replacement_name or "no change" }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+{% endblock %}

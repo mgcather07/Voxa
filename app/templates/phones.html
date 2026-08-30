@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% block title %}Phones{% endblock %}
+{% block content %}
+
+<div class="card">
+  <h2>Phone inventory</h2>
+  <p class="hint">
+    Live from CUCM. Serial number and switch port come from the phone itself,
+    so they are only present where web access is enabled and the phone was
+    reachable. Showing up to 500 matches.
+  </p>
+
+  <form class="filters"
+        hx-get="/phones/rows"
+        hx-target="#rows"
+        hx-trigger="input changed delay:300ms from:find input, change from:find select"
+        hx-swap="innerHTML">
+    <div class="field">
+      <label for="q">Search</label>
+      <input type="search" id="q" name="q" value="{{ filters.q }}"
+             placeholder="name, description, DN, IP, serial, switch">
+    </div>
+    <div class="field">
+      <label for="site">Site</label>
+      <select id="site" name="site">
+        <option value="">All</option>
+        {% for s in all_sites %}
+        <option value="{{ s }}" {{ 'selected' if filters.site == s }}>{{ s }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="field">
+      <label for="model">Model</label>
+      <select id="model" name="model">
+        <option value="">All</option>
+        {% for m in all_models %}
+        <option value="{{ m }}" {{ 'selected' if filters.model == m }}>{{ m }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="field">
+      <label for="lifecycle">Lifecycle</label>
+      <select id="lifecycle" name="lifecycle">
+        <option value="">All</option>
+        {% for l in ["eol", "eos", "current", "unknown"] %}
+        <option value="{{ l }}" {{ 'selected' if filters.lifecycle == l }}>{{ l }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="field">
+      <label for="status">Registration</label>
+      <select id="status" name="status">
+        <option value="">All</option>
+        {% for s in all_statuses %}
+        <option value="{{ s }}" {{ 'selected' if filters.status == s }}>{{ s }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="field">
+      <label for="swap">Swap status</label>
+      <select id="swap" name="swap">
+        <option value="">All</option>
+        {% for s in swap_statuses %}
+        <option value="{{ s }}" {{ 'selected' if filters.swap == s }}>{{ s.replace('_', ' ') }}</option>
+        {% endfor %}
+      </select>
+    </div>
+  </form>
+
+  <div class="scroll tallest">
+    <table>
+      <thead>
+        <tr>
+          <th>Device</th>
+          <th>Description</th>
+          <th>DN</th>
+          <th>Model</th>
+          <th>Life</th>
+          <th>Reg</th>
+          <th>IP</th>
+          <th>Serial</th>
+          <th>Switch / port</th>
+          <th class="num">PoE</th>
+          <th>Replace with</th>
+          <th>Swap</th>
+        </tr>
+      </thead>
+      <tbody id="rows">
+        {% include "_phone_rows.html" %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% endblock %}

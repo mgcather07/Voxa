@@ -1,0 +1,32 @@
+{% if not phones %}
+<tr><td colspan="12" class="empty">No phones match these filters.</td></tr>
+{% endif %}
+{% for p in phones %}
+<tr>
+  <td class="mono">{{ p.device_name }}</td>
+  <td>{{ p.description or "" }}</td>
+  <td class="mono">{{ p.directory_number or "" }}</td>
+  <td>{{ p.model_raw or p.model_key or "—" }}</td>
+  <td><span class="pill {{ p.lifecycle or 'unknown' }}">{{ p.lifecycle or "unknown" }}</span></td>
+  <td>
+    {% if p.registration_status == "Registered" %}
+      <span class="pill reg">reg</span>
+    {% elif p.registration_status in ("UnRegistered", "Unregistered", "Rejected") %}
+      <span class="pill unreg" title="{{ p.status_reason or '' }}">unreg</span>
+    {% else %}
+      <span class="pill other" title="{{ p.status_reason or '' }}">{{ p.registration_status or "?" }}</span>
+    {% endif %}
+  </td>
+  <td class="mono">{{ p.ip_address or "" }}</td>
+  <td class="mono">{{ p.serial_number or "" }}</td>
+  <td class="mono">
+    {% if p.switch_name %}{{ p.switch_name }}{% if p.switch_port %} / {{ p.switch_port }}{% endif %}
+    {% else %}<span class="muted">—</span>{% endif %}
+  </td>
+  <td class="num">{{ "%.1f"|format(p.poe_watts or 0) }}W</td>
+  <td class="muted">{{ p.replacement_name or "—" }}</td>
+  <td id="swap-{{ p.id }}">
+    {% with phone = p %}{% include "_swap_cell.html" %}{% endwith %}
+  </td>
+</tr>
+{% endfor %}

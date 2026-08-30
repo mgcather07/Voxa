@@ -1,0 +1,23 @@
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# Secrets — never commit these
+.env
+.env.prod
+deploy/certs/*
+!deploy/certs/.gitkeep
+
+# Local data
+*.db
+*.sqlite3
+backups/
+
+# Editors / OS
+.DS_Store
+.idea/
+.vscode/
+*.swp

@@ -1,0 +1,14 @@
+{% if phone %}
+<select class="inline"
+        name="swap_status"
+        hx-post="/phones/{{ phone.id }}/swap"
+        hx-target="#swap-{{ phone.id }}"
+        hx-swap="innerHTML"
+        hx-trigger="change">
+  {% for s in swap_statuses %}
+  <option value="{{ s }}" {{ 'selected' if phone.swap_status == s }}>
+    {{ s.replace('_', ' ') }}
+  </option>
+  {% endfor %}
+</select>
+{% endif %}
