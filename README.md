@@ -1,6 +1,6 @@
-# CUCM Phone Inventory & Refresh Planner
+# Voxa — Call Telemetry & Phone Refresh Planner
 
-A read-only web app that pulls a live phone inventory out of Cisco Unified
+**Voxa** is a read-only web app that pulls a live phone inventory out of Cisco Unified
 Communications Manager and turns it into a refresh plan: what you have, what
 it maps to, where each phone is physically plugged in, and what the swap does
 to your PoE budget closet by closet.
@@ -43,7 +43,7 @@ your cluster version supports the model before you plan around it.
 
 ### 1. CUCM service account
 
-In **User Management → Application User**, create a user (e.g. `phoneinv-ro`)
+In **User Management → Application User**, create a user (e.g. `voxa-ro`)
 and give it these roles:
 
 - `Standard AXL API Access` — the SQL query

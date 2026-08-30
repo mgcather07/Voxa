@@ -162,7 +162,7 @@ authentication is a successful re-bind as the user's own DN.
 
 A Linux VM on vSphere, Docker Compose stack behind nginx with TLS. See
 `docs/DEPLOY.md` for the VM spec, firewall rules, TLS, backup, and upgrade
-commands. `deploy/phone-inventory.service` is a systemd fallback if Docker
+commands. `deploy/voxa.service` is a systemd fallback if Docker
 isn't approved on the server estate.
 
 Secrets live in `.env.prod` on the VM, `chmod 600`, never committed.

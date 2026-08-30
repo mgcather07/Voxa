@@ -52,9 +52,9 @@ logs:
 
 backup:
 	@mkdir -p backups
-	$(PROD) exec -T db pg_dump -U $${POSTGRES_USER:-phoneinv} $${POSTGRES_DB:-phone_inventory} \
-		| gzip > backups/phone_inventory_$$(date +%Y%m%d_%H%M%S).sql.gz
-	@echo "Wrote backups/phone_inventory_$$(date +%Y%m%d)*.sql.gz"
+	$(PROD) exec -T db pg_dump -U $${POSTGRES_USER:-voxa} $${POSTGRES_DB:-voxa} \
+		| gzip > backups/voxa_$$(date +%Y%m%d_%H%M%S).sql.gz
+	@echo "Wrote backups/voxa_$$(date +%Y%m%d)*.sql.gz"
 
 shell:
-	$(PROD) exec db psql -U $${POSTGRES_USER:-phoneinv} $${POSTGRES_DB:-phone_inventory}
+	$(PROD) exec db psql -U $${POSTGRES_USER:-voxa} $${POSTGRES_DB:-voxa}

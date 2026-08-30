@@ -58,9 +58,9 @@ conversation.
 sudo apt update && sudo apt install -y docker.io docker-compose-v2 git make
 sudo usermod -aG docker $USER && newgrp docker
 
-sudo mkdir -p /opt/phone-inventory && sudo chown $USER /opt/phone-inventory
-git clone <your-repo-url> /opt/phone-inventory
-cd /opt/phone-inventory
+sudo mkdir -p /opt/voxa && sudo chown $USER /opt/voxa
+git clone <your-repo-url> /opt/voxa
+cd /opt/voxa
 ```
 
 ## 4. Configure
@@ -137,7 +137,7 @@ make down        # stop
 **Upgrade:**
 
 ```bash
-cd /opt/phone-inventory
+cd /opt/voxa
 make backup
 git pull
 make build && make up
@@ -149,9 +149,9 @@ tables it needs on startup but does not run migrations — see the note below.
 **Restore:**
 
 ```bash
-gunzip -c backups/phone_inventory_YYYYMMDD_HHMMSS.sql.gz | \
+gunzip -c backups/voxa_YYYYMMDD_HHMMSS.sql.gz | \
   docker compose -f docker-compose.prod.yml exec -T db \
-  psql -U phoneinv phone_inventory
+  psql -U voxa voxa
 ```
 
 **Back up:** the Postgres volume and `.env.prod`. Everything else is in git.
@@ -183,9 +183,9 @@ and notes, not just cached inventory.
 
 ## Without Docker
 
-If containers aren't approved on your server estate, `deploy/phone-inventory.service`
+If containers aren't approved on your server estate, `deploy/voxa.service`
 is a systemd unit. You'll need Python 3.12 and Postgres installed on the VM,
-the repo at `/opt/phone-inventory` with a venv, a `phoneinv` system user, and
+the repo at `/opt/voxa` with a venv, a `voxa` system user, and
 nginx configured as a reverse proxy to `127.0.0.1:8000`. Same `.env.prod`.
 
 ---

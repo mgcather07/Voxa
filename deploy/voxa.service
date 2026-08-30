@@ -1,24 +1,24 @@
 # systemd unit for a VM where Docker is not approved.
 #
-#   sudo cp deploy/phone-inventory.service /etc/systemd/system/
+#   sudo cp deploy/voxa.service /etc/systemd/system/
 #   sudo systemctl daemon-reload
-#   sudo systemctl enable --now phone-inventory
+#   sudo systemctl enable --now voxa
 #
-# Assumes the repo is at /opt/phone-inventory with a venv at .venv, owned by
-# a system user 'phoneinv', and Postgres installed on the VM.
+# Assumes the repo is at /opt/voxa with a venv at .venv, owned by
+# a system user 'voxa', and Postgres installed on the VM.
 
 [Unit]
-Description=CUCM Phone Inventory
+Description=Voxa - CUCM Call Telemetry
 After=network-online.target postgresql.service
 Wants=network-online.target
 
 [Service]
 Type=exec
-User=phoneinv
-Group=phoneinv
-WorkingDirectory=/opt/phone-inventory
-EnvironmentFile=/opt/phone-inventory/.env.prod
-ExecStart=/opt/phone-inventory/.venv/bin/uvicorn app.main:app \
+User=voxa
+Group=voxa
+WorkingDirectory=/opt/voxa
+EnvironmentFile=/opt/voxa/.env.prod
+ExecStart=/opt/voxa/.venv/bin/uvicorn app.main:app \
     --host 127.0.0.1 --port 8000 --workers 2 \
     --proxy-headers --forwarded-allow-ips '*'
 Restart=on-failure

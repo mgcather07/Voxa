@@ -26,11 +26,11 @@ class Settings(BaseSettings):
 
     # Database
     database_url: str = (
-        "postgresql+psycopg://cucm:cucm@localhost:5433/cucm_inventory"
+        "postgresql+psycopg://voxa:voxa@localhost:5433/voxa"
     )
 
     # App behaviour
-    app_name: str = "Phone Inventory"
+    app_name: str = "Voxa"
     site_from_device_pool: str = r"^(?:DP_)?(?P<site>[A-Za-z0-9]+)"
     mock_mode: bool = False
 

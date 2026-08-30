@@ -1,4 +1,4 @@
-"""FastAPI application - CUCM phone inventory and refresh planner."""
+"""Voxa - FastAPI application for CUCM call telemetry and phone refresh planning."""
 
 from __future__ import annotations
 
@@ -34,7 +34,7 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s  %(levelname)-7s %(name)s  %(message)s",
 )
-log = logging.getLogger("cucm-inventory")
+log = logging.getLogger("voxa")
 
 BASE_DIR = Path(__file__).resolve().parent
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
@@ -436,7 +436,7 @@ def export_csv(
         iter([buffer.getvalue()]),
         media_type="text/csv",
         headers={
-            "Content-Disposition": 'attachment; filename="cucm-phone-inventory.csv"'
+            "Content-Disposition": 'attachment; filename="voxa-phone-inventory.csv"'
         },
     )
 

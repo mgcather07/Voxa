@@ -8,7 +8,7 @@ Everything here is read-only access. The app never writes to CUCM.
 
 **User Management → Application User → Add New**
 
-- User ID: `phoneinv-ro`
+- User ID: `voxa-ro`
 - Password: generate something long; it goes in `.env.prod`, nowhere else
 
 Add these roles under **Permissions Information → Add to Access Control
