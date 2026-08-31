@@ -50,6 +50,10 @@ class Settings(BaseSettings):
     snmp_community: str = "public"
     snmp_timeout: int = 2
 
+    # Outbound webhooks — OFF by default. Master switch; individual Webhook rows
+    # also carry an `enabled` flag. When off, nothing ever leaves the app.
+    webhooks_enabled: bool = False
+
     # Authentication
     # secret_key signs the session cookie. Generate with:
     #   python -c "import secrets; print(secrets.token_urlsafe(48))"

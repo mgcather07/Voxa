@@ -5,7 +5,9 @@ from __future__ import annotations
 import csv
 import io
 import logging
+import secrets
 from datetime import timezone
+from hashlib import sha256
 from pathlib import Path
 
 from fastapi import (
@@ -28,6 +30,7 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from . import (
     analytics,
+    api,
     calls,
     capacity,
     exports,
@@ -36,6 +39,7 @@ from . import (
     locations,
     report_templates,
     reports,
+    webhooks,
 )
 from .catalog import DEFAULT_FAMILY, FAMILIES, get_catalog
 from .auth import (
@@ -44,12 +48,14 @@ from .auth import (
     login_user,
     logout_user,
     redirect_to_login,
+    require_admin,
     require_user,
 )
 from .config import get_settings
 from .db import get_session, init_db
 from .models import (
     SWAP_STATUSES,
+    ApiToken,
     CallStat,
     Location,
     LocationRule,
@@ -57,6 +63,7 @@ from .models import (
     SyncRun,
     TrunkCapacity,
     User,
+    Webhook,
 )
 from .models import utcnow
 from .sync import run_sync
@@ -103,6 +110,7 @@ app.add_middleware(
     https_only=settings.session_https_only,
     same_site="lax",
 )
+app.include_router(api.router)
 
 
 @app.exception_handler(RedirectToLogin)
@@ -656,6 +664,123 @@ def report_view(
         raise HTTPException(status_code=404, detail="Unknown report")
     return templates.TemplateResponse(
         "report_view.html", _ctx(request, session, user, report=report)
+    )
+
+
+# ---------------------------------------------------------------------------
+# Integrations (API tokens + webhooks) — admin only
+# ---------------------------------------------------------------------------
+def _integrations_ctx(request, session, user, **extra):
+    return _ctx(
+        request, session, user,
+        tokens=session.scalars(select(ApiToken).order_by(ApiToken.id.desc())).all(),
+        hooks=session.scalars(select(Webhook).order_by(Webhook.id.desc())).all(),
+        webhook_events=webhooks.EVENTS,
+        webhooks_master=settings.webhooks_enabled,
+        **extra,
+    )
+
+
+@app.get("/integrations", response_class=HTMLResponse)
+def integrations_page(
+    request: Request,
+    session: Session = Depends(get_session),
+    user: User = Depends(require_admin),
+):
+    return templates.TemplateResponse(
+        "integrations.html", _integrations_ctx(request, session, user)
+    )
+
+
+@app.post("/integrations/tokens", response_class=HTMLResponse)
+def token_create(
+    request: Request,
+    label: str = Form(...),
+    session: Session = Depends(get_session),
+    user: User = Depends(require_admin),
+):
+    plaintext = "voxa_" + secrets.token_urlsafe(32)
+    session.add(ApiToken(
+        label=label.strip() or "token",
+        token_hash=sha256(plaintext.encode()).hexdigest(),
+        created_by=user.username,
+    ))
+    session.commit()
+    # Show the plaintext once — it is never recoverable after this.
+    return templates.TemplateResponse(
+        "integrations.html", _integrations_ctx(request, session, user, new_token=plaintext)
+    )
+
+
+@app.post("/integrations/tokens/{token_id}/delete")
+def token_delete(
+    token_id: int,
+    session: Session = Depends(get_session),
+    user: User = Depends(require_admin),
+):
+    row = session.get(ApiToken, token_id)
+    if row:
+        session.delete(row)
+        session.commit()
+    return RedirectResponse(url="/integrations", status_code=303)
+
+
+@app.post("/integrations/webhooks")
+def webhook_create(
+    url: str = Form(...),
+    events: list[str] = Form(default=[]),
+    secret: str = Form(""),
+    session: Session = Depends(get_session),
+    user: User = Depends(require_admin),
+):
+    if url.strip().startswith(("http://", "https://")):
+        session.add(Webhook(
+            url=url.strip(),
+            events=",".join(events),
+            secret=secret.strip() or None,
+            enabled=False,
+        ))
+        session.commit()
+    return RedirectResponse(url="/integrations", status_code=303)
+
+
+@app.post("/integrations/webhooks/{hook_id}/toggle")
+def webhook_toggle(
+    hook_id: int,
+    session: Session = Depends(get_session),
+    user: User = Depends(require_admin),
+):
+    hook = session.get(Webhook, hook_id)
+    if hook:
+        hook.enabled = not hook.enabled
+        session.commit()
+    return RedirectResponse(url="/integrations", status_code=303)
+
+
+@app.post("/integrations/webhooks/{hook_id}/delete")
+def webhook_delete(
+    hook_id: int,
+    session: Session = Depends(get_session),
+    user: User = Depends(require_admin),
+):
+    hook = session.get(Webhook, hook_id)
+    if hook:
+        session.delete(hook)
+        session.commit()
+    return RedirectResponse(url="/integrations", status_code=303)
+
+
+@app.post("/integrations/webhooks/{hook_id}/test", response_class=HTMLResponse)
+def webhook_test(
+    request: Request,
+    hook_id: int,
+    session: Session = Depends(get_session),
+    user: User = Depends(require_admin),
+):
+    hook = session.get(Webhook, hook_id)
+    result = webhooks.send_test(session, hook) if hook else "not found"
+    return templates.TemplateResponse(
+        "integrations.html", _integrations_ctx(request, session, user, test_result=result)
     )
 
 

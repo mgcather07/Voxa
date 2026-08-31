@@ -134,8 +134,10 @@ Plugged into the Phase-4 reports engine (CSV / XLSX / print for free).
 - ✅ `TrunkCapacity` (editable channels per trunk) → utilization %
 - ✅ `/capacity` page (concurrency chart + per-trunk table)
 
-## Phase 13 — Read API + opt-in webhooks  ⬜
-- ⬜ `GET /api/v1/...` JSON (phones, calls, analytics) behind a bearer token
-- ⬜ `ApiToken` model + management
-- ⬜ Opt-in outbound webhooks (disabled by default): `Webhook` config, HMAC
-     signing, events from sync/ingest (phones.changed, call.quality_alert)
+## Phase 13 — Read API + opt-in webhooks  ✅
+- ✅ `GET /api/v1/...` JSON (phones, phone, calls, call, summary, analytics,
+     reports) behind a bearer token (`app/api.py`)
+- ✅ `ApiToken` model (hashed) + `/integrations` management (admin)
+- ✅ Opt-in outbound webhooks: `Webhook` config, HMAC-SHA256 signing, events on
+     sync/ingest (phones.changed, sync.completed, call.quality_alert). DORMANT
+     unless `WEBHOOKS_ENABLED` and a hook is enabled — the one outbound feature.

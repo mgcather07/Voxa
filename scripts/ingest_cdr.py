@@ -14,9 +14,12 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from app import cdr  # noqa: E402
+from sqlalchemy import func, select  # noqa: E402
+
+from app import cdr, webhooks  # noqa: E402
 from app.config import get_settings  # noqa: E402
 from app.db import init_db, session_scope  # noqa: E402
+from app.models import CallQuality  # noqa: E402
 
 
 def main() -> int:
@@ -24,10 +27,16 @@ def main() -> int:
     directory = sys.argv[1] if len(sys.argv) > 1 else get_settings().cdr_dir
     with session_scope() as session:
         result = cdr.ingest_directory(session, directory)
+        poor = session.scalar(
+            select(func.count()).select_from(CallQuality)
+            .where(CallQuality.mos.is_not(None), CallQuality.mos < 3.6)
+        ) or 0
     print(
         f"Ingested {result['files']} file(s) from {directory}; "
         f"updated {result['devices']} device(s)."
     )
+    # Opt-in webhook (no-op unless enabled).
+    webhooks.fire("call.quality_alert", {"poor_quality_legs": int(poor)})
     return 0
 
 

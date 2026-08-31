@@ -10,9 +10,10 @@ from sqlalchemy import select
 
 from .catalog import get_catalog
 from .config import Settings, get_settings
+from . import webhooks
 from .cucm import AxlClient, RisPortClient, fetch_many
 from .db import session_scope
-from .history import record_snapshots
+from .history import latest_diff, record_snapshots
 from .models import Phone, SyncRun
 
 log = logging.getLogger(__name__)
@@ -184,6 +185,19 @@ def run_sync(settings: Settings | None = None) -> int:
                 run.finished_at = datetime.now(timezone.utc)
 
         log.info("Sync %s complete: %s created, %s updated", run_id, created, updated)
+
+        # Opt-in webhooks (no-op unless WEBHOOKS_ENABLED and a hook is enabled).
+        with session_scope() as session:
+            diff = latest_diff(session)
+        if diff is not None:
+            webhooks.fire("phones.changed", {
+                "appeared": len(diff.appeared), "dropped": len(diff.dropped),
+                "moved": len(diff.moved), "reg_changed": len(diff.reg_changed),
+                "firmware_changed": len(diff.firmware_changed),
+            })
+        webhooks.fire("sync.completed", {
+            "run_id": run_id, "created": created, "updated": updated,
+        })
 
     except Exception as exc:  # noqa: BLE001 - surface the reason in the UI
         log.exception("Sync %s failed", run_id)

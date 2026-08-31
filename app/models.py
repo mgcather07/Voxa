@@ -114,6 +114,43 @@ class PhoneSnapshot(Base):
     )
 
 
+class ApiToken(Base):
+    """A bearer token for the read-only JSON API. Only the SHA-256 hash is
+    stored; the plaintext is shown once at creation."""
+
+    __tablename__ = "api_tokens"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    label: Mapped[str] = mapped_column(String(128))
+    token_hash: Mapped[str] = mapped_column(String(64), index=True)
+    created_by: Mapped[str | None] = mapped_column(String(128))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow
+    )
+    last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class Webhook(Base):
+    """An opt-in outbound webhook. Disabled globally by default (WEBHOOKS_ENABLED)
+    and per-row (`enabled`); fires signed POSTs on sync/ingest events."""
+
+    __tablename__ = "webhooks"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    url: Mapped[str] = mapped_column(String(512))
+    events: Mapped[str] = mapped_column(String(255), default="")  # comma-separated
+    secret: Mapped[str | None] = mapped_column(String(128))
+    enabled: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow
+    )
+    last_fired_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_status: Mapped[str | None] = mapped_column(String(64))
+
+    def event_list(self) -> list[str]:
+        return [e.strip() for e in (self.events or "").split(",") if e.strip()]
+
+
 class User(Base):
     __tablename__ = "users"
     __table_args__ = (UniqueConstraint("username", name="uq_users_username"),)

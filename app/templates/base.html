@@ -61,6 +61,11 @@
       <a class="nav-item {{ 'on' if path.startswith('/reports') }}" href="/reports">
         <span class="bar"></span>Reports
       </a>
+      {% if not user or user.is_admin %}
+      <a class="nav-item {{ 'on' if path == '/integrations' }}" href="/integrations">
+        <span class="bar"></span>Integrations
+      </a>
+      {% endif %}
     </nav>
 
     <div class="sidebar-foot">

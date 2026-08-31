@@ -274,6 +274,26 @@ is present.
 
 ---
 
+## Integrations (read API + webhooks)
+
+**Read-only JSON API.** Create a bearer token at **Integrations** (admin), then:
+
+```bash
+curl -H "Authorization: Bearer <token>" https://<vm>/api/v1/phones
+```
+
+Endpoints under `/api/v1`: `phones`, `phones/{id}`, `calls`, `calls/{key}`,
+`summary`, `analytics`, `reports/{key}`. Every one is a read.
+
+**Outbound webhooks are OFF by default.** They are the *only* feature that sends
+data out of Voxa (still never to CUCM). They stay dormant unless you set
+`WEBHOOKS_ENABLED=true` **and** enable a webhook row on the Integrations page.
+When on, Voxa POSTs HMAC-SHA256-signed events (`phones.changed`,
+`sync.completed`, `call.quality_alert`) after a collection or CDR ingest — batch,
+not realtime.
+
+---
+
 ## Schema changes
 
 `init_db()` calls `create_all()`, which creates missing tables but **does not
