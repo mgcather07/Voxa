@@ -148,20 +148,17 @@ Target: a Linux VM on the company vSphere estate, behind nginx with TLS.
 
 ## Ideas / roadmap (all doable read-only)
 
-- [ ] **Cluster status page** — once a cluster is connected, show node health:
-      publisher + subscribers (already discovered from `processnode`), per-node
-      registered-device counts (RisPort already returns these per `CmNode`), and
-      8443 reachability. Foundation: persist a `ClusterNode` table at collection.
-- [ ] **Resolve the ladder's CUCM IP to a node name** — the ladder shows the
-      registered node (sometimes an IP). With a stored node name↔IP map (same
-      `ClusterNode` table), display "IP (nodename)". Shares infra with the status
-      page above.
-- [ ] **Certificate inventory** — connect to each node's TLS ports (8443 tomcat,
-      5061 CallManager SIP, 2443 CAPF, …) and read the served leaf certificate:
-      subject, issuer, SAN, valid-from/-to, **days-to-expiry**, self-signed vs
-      CA-signed. Pure TLS handshake = fully read-only, no special CUCM API.
-      Flag expiring/expired. (Certs not served on a socket — e.g. ITLRecovery —
-      would need the PAWS API, which is version-specific; start with served certs.)
+- [x] **Cluster status** — ✅ built. Dashboard "Cluster nodes" card: each node's
+      description, Voice/Video vs IM&P, and registered-device count. `ClusterNode`
+      table, populated each collection from `processnode` + RisPort per-node counts.
+- [x] **Ladder IP → node name** — ✅ built. The ladder resolves the CUCM node
+      IP/hostname to its `processnode` description (e.g. "Jasper Subscriber").
+- [x] **Certificate inventory** — ✅ built. `/certificates` reads each reachable
+      node's served TLS certs (8443 Tomcat, 5061 CallManager, 2443 CAPF) with a
+      read-only handshake: subject, issuer, self-signed vs CA, days-to-expiry,
+      SAN; flags expired/expiring. Hostname-only nodes need internal DNS (works
+      on the VM; over the VPN, IP-addressed nodes resolve). Certs not served on a
+      socket (ITLRecovery) would need the version-specific PAWS API — out of scope.
 - [ ] **MOS/quality in the ladder** — color a lifeline / badge a leg when its
       CMR MOS was poor (quality is already ingested).
 - [ ] **Harden ingest** — track/rotate processed CDR files so re-runs don't
