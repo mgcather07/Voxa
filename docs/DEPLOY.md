@@ -243,6 +243,21 @@ Or a host crontab line, if you prefer cron:
   >> /var/log/voxa-collect.log 2>&1
 ```
 
+### CDR/CMR call analytics
+
+Point CUCM's Billing Application Server at an SFTP endpoint that lands files in
+`CDR_DIR` (default `/var/lib/voxa/cdr`), mount that path into the app container,
+and fold new files into per-device call stats on a schedule:
+
+```bash
+make ingest        # or: docker compose … exec -T app python scripts/ingest_cdr.py
+```
+
+Voxa keeps per-device aggregates (call volume, last call, rough MOS) — enough to
+answer "which phones does nobody use, so we needn't replace them" — not raw call
+records. The app never opens an SFTP connection itself; landing the files is the
+OS's job, same as scheduled collection.
+
 ---
 
 ## Schema changes

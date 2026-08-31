@@ -34,6 +34,11 @@ class Settings(BaseSettings):
     site_from_device_pool: str = r"^(?:DP_)?(?P<site>[A-Za-z0-9]+)"
     mock_mode: bool = False
 
+    # CDR/CMR ingest — the directory CUCM's Billing Application Server pushes
+    # call detail / call quality CSVs to (the OS/SFTP lands them here). Read by
+    # scripts/ingest_cdr.py; the app never opens an SFTP connection itself.
+    cdr_dir: str = "/var/lib/voxa/cdr"
+
     # Authentication
     # secret_key signs the session cookie. Generate with:
     #   python -c "import secrets; print(secrets.token_urlsafe(48))"

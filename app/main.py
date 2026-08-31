@@ -38,6 +38,7 @@ from .config import get_settings
 from .db import get_session, init_db
 from .models import (
     SWAP_STATUSES,
+    CallStat,
     Location,
     LocationRule,
     Phone,
@@ -206,6 +207,7 @@ def dashboard(
             models=reports.by_model(session),
             sites=reports.by_site(session),
             unverified=reports.unverified_models(session),
+            call_activity=reports.call_activity(session),
         ),
     )
 
@@ -363,11 +365,15 @@ def phone_detail(
     info = get_catalog().lookup(phone.model_raw)
     timeline = history.device_timeline(session, phone.device_name)
     location = locations.resolve_phone(session, phone)
+    call_stat = session.scalars(
+        select(CallStat).where(CallStat.device_name == phone.device_name)
+    ).first()
     return templates.TemplateResponse(
         "phone_detail.html",
         _ctx(
             request, session, user,
             phone=phone, info=info, timeline=timeline, location=location,
+            call_stat=call_stat,
         ),
     )
 

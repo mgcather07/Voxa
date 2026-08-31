@@ -17,6 +17,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from app.catalog import get_catalog  # noqa: E402
 from app.db import init_db, session_scope  # noqa: E402
 from app.models import (  # noqa: E402
+    CallStat,
     Location,
     LocationRule,
     Phone,
@@ -88,6 +89,7 @@ def main() -> None:
     with session_scope() as session:
         if wipe:
             session.query(PhoneSnapshot).delete()
+            session.query(CallStat).delete()
             session.query(LocationRule).delete()
             session.query(Location).delete()
             session.query(Phone).delete()
@@ -172,8 +174,34 @@ def main() -> None:
 
         _seed_history(session, created_phones, now)
         _seed_locations(session)
+        _seed_call_stats(session, created_phones, now)
 
     print(f"Seeded {count} mock phones across {len(SITES)} sites.")
+
+
+def _seed_call_stats(session, phones: list[Phone], now: datetime) -> None:
+    """Give ~75% of phones call activity; the rest are 'unused' (no CallStat),
+    so the 'don't replace what nobody uses' report has something to find."""
+    for p in phones:
+        if random.random() < 0.25:
+            continue  # unused phone — no call activity
+        total = random.randint(1, 400)
+        outbound = random.randint(0, total)
+        session.add(
+            CallStat(
+                device_name=p.device_name,
+                total_calls=total,
+                outbound_calls=outbound,
+                inbound_calls=total - outbound,
+                total_seconds=total * random.randint(25, 320),
+                last_call_at=now - timedelta(
+                    days=random.randint(0, 20),
+                    minutes=random.randint(0, 1440),
+                ),
+                mos_sum=round(total * random.uniform(3.6, 4.5), 2),
+                mos_count=total,
+            )
+        )
 
 
 SITE_ADDRESSES = {

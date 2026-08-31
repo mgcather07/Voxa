@@ -61,15 +61,16 @@ stylesheet instead of a PDF library.
 - ✅ `/reports` page: view on screen, CSV / Excel export, print-to-PDF
 - ✅ Scheduled report delivery: `scripts/report.py` dumps files for cron + OS SFTP
 
-## Phase 5 — CDR/CMR ingest (call analytics)  ⬜
-Call Telemetry's Call Analytics; Voxa roadmap #3. The big one — phased inside.
-*Dep: an SFTP endpoint or a watched drop directory.*
+## Phase 5 — CDR/CMR ingest (call analytics)  ✅
+Call Telemetry's Call Analytics; Voxa roadmap #3. Read from a drop directory
+(the OS/SFTP lands files; the app has no SFTP client). Aggregates, not raw
+records — enough to answer "which phones does nobody use?".
 
-- ⬜ Landing point for CUCM billing CSVs (SFTP or drop dir)
-- ⬜ Parse CDR (call volume per device) and CMR (MOS / quality)
-- ⬜ Call-record / aggregate schema
-- ⬜ Phone 360: per-device call volume + last call ("don't replace unused")
-- ⬜ Dashboard: utilization + quality summaries
+- ✅ Drop-directory landing (`CDR_DIR`), no SFTP client in the app
+- ✅ Tolerant CDR/CMR parser (`app/cdr.py`) — call volume + MOS, per device
+- ✅ `CallStat` aggregate schema; `scripts/ingest_cdr.py` for cron
+- ✅ Phone 360: call volume / talk time / last call / MOS, or "retire not replace"
+- ✅ Dashboard call-activity card + an "unused phones" report
 
 ## Phase 6 — Enablers  ⬜
 - ⬜ AD/LDAP auth (finish the stubbed `LdapAuthBackend`) — *dep: ldap3*

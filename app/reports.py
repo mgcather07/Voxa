@@ -8,7 +8,7 @@ from sqlalchemy import case, func, select
 from sqlalchemy.orm import Session
 
 from .catalog import DEFAULT_FAMILY, get_catalog
-from .models import Phone
+from .models import CallStat, Phone
 
 
 @dataclass
@@ -288,6 +288,35 @@ def poe_by_switch(session: Session, family: str = DEFAULT_FAMILY) -> list[dict]:
         )
     out.sort(key=lambda r: -r["ports"])
     return out
+
+
+def call_activity(session: Session) -> dict:
+    """Fleet call-activity summary from CallStat. Powers the "which phones does
+    nobody use, so don't replace them" question and a rough fleet MOS."""
+    total_calls = session.scalar(
+        select(func.coalesce(func.sum(CallStat.total_calls), 0))
+    ) or 0
+    active = session.scalar(
+        select(func.count()).select_from(CallStat).where(CallStat.total_calls > 0)
+    ) or 0
+    active_names = select(CallStat.device_name).where(CallStat.total_calls > 0)
+    total_phones = _count(session)
+    unused = session.scalar(
+        select(func.count()).select_from(Phone).where(
+            Phone.device_name.not_in(active_names)
+        )
+    ) or 0
+    mos_sum = session.scalar(select(func.coalesce(func.sum(CallStat.mos_sum), 0.0))) or 0.0
+    mos_count = session.scalar(select(func.coalesce(func.sum(CallStat.mos_count), 0))) or 0
+    return {
+        "has_data": bool(active),
+        "total_calls": int(total_calls),
+        "active": int(active),
+        "unused": int(unused),
+        "total_phones": total_phones,
+        "unused_pct": round(100 * unused / total_phones) if total_phones else 0,
+        "avg_mos": round(mos_sum / mos_count, 2) if mos_count else None,
+    }
 
 
 def unverified_models(session: Session) -> list[str]:

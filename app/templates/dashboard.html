@@ -58,6 +58,29 @@
 </div>
 {% endif %}
 
+{% if call_activity.has_data %}
+<div class="card">
+  <div class="card-head">
+    <h2>Call activity</h2>
+    <span class="subhead">from CDR/CMR — which phones are actually used</span>
+  </div>
+  <div class="callrow">
+    <div class="callstat">
+      <span class="cs-value tnum">{{ "{:,}".format(call_activity.total_calls) }}</span>
+      <span class="cs-label">calls across {{ call_activity.active }} phones</span>
+    </div>
+    <div class="callstat">
+      <span class="cs-value tnum" style="color:var(--orange)">{{ call_activity.unused }}</span>
+      <span class="cs-label">unused ({{ call_activity.unused_pct }}%) — retire, don't replace</span>
+    </div>
+    <div class="callstat">
+      <span class="cs-value tnum" style="color:{{ 'var(--green)' if call_activity.avg_mos and call_activity.avg_mos >= 4 else 'var(--orange)' }}">{{ call_activity.avg_mos or "—" }}</span>
+      <span class="cs-label">fleet average MOS</span>
+    </div>
+  </div>
+</div>
+{% endif %}
+
 <div class="grid dash-two">
   <div class="card">
     <div class="card-head">

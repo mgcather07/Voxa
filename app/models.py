@@ -138,6 +138,41 @@ class User(Base):
         return f"<User {self.username} source={self.source} admin={self.is_admin}>"
 
 
+class CallStat(Base):
+    """Per-device call activity, aggregated from CUCM CDR/CMR files.
+
+    Voxa keeps aggregates, not raw call records: the planning question is "which
+    phones does nobody use, so we needn't replace them?" plus rough call quality.
+    Keyed by CUCM device name so it lines up with the phone inventory.
+    """
+
+    __tablename__ = "call_stats"
+    __table_args__ = (
+        UniqueConstraint("device_name", name="uq_call_stats_device_name"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    device_name: Mapped[str] = mapped_column(String(64), index=True)
+    total_calls: Mapped[int] = mapped_column(Integer, default=0)
+    inbound_calls: Mapped[int] = mapped_column(Integer, default=0)
+    outbound_calls: Mapped[int] = mapped_column(Integer, default=0)
+    total_seconds: Mapped[int] = mapped_column(Integer, default=0)
+    last_call_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    mos_sum: Mapped[float] = mapped_column(Float, default=0.0)
+    mos_count: Mapped[int] = mapped_column(Integer, default=0)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow
+    )
+
+    @property
+    def avg_mos(self) -> float | None:
+        return round(self.mos_sum / self.mos_count, 2) if self.mos_count else None
+
+    @property
+    def total_minutes(self) -> int:
+        return round(self.total_seconds / 60)
+
+
 class Location(Base):
     """A dispatchable location for E911. Voxa-owned data (never from CUCM)."""
 

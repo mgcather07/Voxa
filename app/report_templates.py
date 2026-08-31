@@ -10,12 +10,14 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from . import reports
-from .models import Phone
+from .models import CallStat, Phone
 
 # Order shown on the /reports index.
 REPORT_META = [
     ("eol-priority", "Replace first",
      "Phones past end of support — no TAC, no firmware. The order-first list."),
+    ("unused-phones", "Unused phones",
+     "No calls recorded — candidates to retire rather than replace."),
     ("coverage-gaps", "Discovery gaps",
      "Phones missing a serial or a switch port, so you know what to chase."),
     ("by-site", "Fleet by site",
@@ -85,8 +87,27 @@ def _by_model(session: Session):
     return "Fleet by model", "What you have and what it maps to", columns, data
 
 
+def _unused_phones(session: Session):
+    active = select(CallStat.device_name).where(CallStat.total_calls > 0)
+    rows = session.scalars(
+        select(Phone)
+        .where(Phone.device_name.not_in(active))
+        .order_by(Phone.site, Phone.device_name)
+    ).all()
+    columns = ["Device", "DN", "Model", "Site", "Lifecycle"]
+    data = [
+        [
+            p.device_name, p.directory_number or "",
+            p.model_raw or p.model_key or "", p.site or "", p.lifecycle or "",
+        ]
+        for p in rows
+    ]
+    return "Unused phones", "No calls recorded — retire rather than replace", columns, data
+
+
 _BUILDERS = {
     "eol-priority": _eol_priority,
+    "unused-phones": _unused_phones,
     "coverage-gaps": _coverage_gaps,
     "by-site": _by_site,
     "by-model": _by_model,
