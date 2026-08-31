@@ -1,6 +1,6 @@
 {% extends "base.html" %}
-{% block title %}Fleet overview &middot; {{ settings.app_name }}{% endblock %}
-{% block page_title %}Fleet overview{% endblock %}
+{% block title %}Inventory overview &middot; {{ settings.app_name }}{% endblock %}
+{% block page_title %}Inventory overview{% endblock %}
 {% block content %}
 
 {% if summary.total == 0 %}
@@ -92,7 +92,7 @@
     </div>
     <div class="callstat">
       <span class="cs-value tnum" style="color:{{ 'var(--green)' if call_activity.avg_mos and call_activity.avg_mos >= 4 else 'var(--orange)' }}">{{ call_activity.avg_mos or "—" }}</span>
-      <span class="cs-label">fleet average MOS</span>
+      <span class="cs-label">inventory average MOS</span>
     </div>
   </div>
 </div>

@@ -15,12 +15,12 @@
   <div class="tiles">
     <div class="tile"><div class="label">Calls (14 days)</div>
       <div class="value-row"><span class="value tnum">{{ "{:,}".format(a.total_calls) }}</span></div>
-      <div class="note">across the fleet</div></div>
+      <div class="note">across the inventory</div></div>
     <div class="tile"><div class="label">Answered</div>
       <div class="value-row"><span class="value tnum" style="color:var(--green)">{{ a.answered_pct }}%</span></div>
       <div class="progress"><span style="width:{{ a.answered_pct }}%;background:var(--green)"></span></div>
       <div class="note">{{ a.missed }} missed ({{ a.missed_pct }}%)</div></div>
-    <div class="tile"><div class="label">Fleet avg MOS</div>
+    <div class="tile"><div class="label">Inventory avg MOS</div>
       <div class="value-row"><span class="value tnum" style="color:{{ 'var(--green)' if a.avg_mos and a.avg_mos >= 4 else 'var(--orange)' }}">{{ a.avg_mos or "—" }}</span></div>
       <div class="note">call quality</div></div>
     <div class="tile"><div class="label">Busy hour</div>

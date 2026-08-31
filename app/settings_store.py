@@ -30,9 +30,9 @@ from .models import Cluster, Setting
 # key, type, secret, group, label
 SCHEMA = [
     ("app_name", "str", False, "Application", "App name"),
-    ("phone_web_enabled", "bool", False, "Discovery", "Scrape phones for serial/switch"),
+    ("phone_web_enabled", "bool", False, "Discovery", "Query phones for serial/switch"),
     ("phone_web_timeout", "int", False, "Discovery", "Phone web timeout (s)"),
-    ("phone_web_concurrency", "int", False, "Discovery", "Phone scrape concurrency"),
+    ("phone_web_concurrency", "int", False, "Discovery", "Phone query concurrency"),
     ("site_from_device_pool", "str", False, "Discovery", "Site-from-device-pool regex"),
     ("cdr_dir", "str", False, "CDR", "CDR/CMR drop directory"),
     ("snmp_enabled", "bool", False, "SNMP", "Enable SNMP PoE polling"),

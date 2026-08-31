@@ -23,9 +23,9 @@ REPORT_META = [
      "No calls recorded — candidates to retire rather than replace."),
     ("coverage-gaps", "Discovery gaps",
      "Phones missing a serial or a switch port, so you know what to chase."),
-    ("by-site", "Fleet by site",
+    ("by-site", "Inventory by site",
      "Counts and lifecycle split per site, for phasing the rollout."),
-    ("by-model", "Fleet by model",
+    ("by-model", "Inventory by model",
      "What you have and what each maps to, quantities for a quote."),
     ("missed-calls", "Missed calls",
      "Unanswered calls with the disconnect cause — from CDR."),
@@ -83,7 +83,7 @@ def _by_site(session: Session):
         [s["site"], s["total"], s["eol"], s["eos"], s["current"], s["reg_pct"]]
         for s in reports.by_site(session)
     ]
-    return "Fleet by site", "Counts and lifecycle per site", columns, data
+    return "Inventory by site", "Counts and lifecycle per site", columns, data
 
 
 def _by_model(session: Session):
@@ -95,7 +95,7 @@ def _by_model(session: Session):
         ]
         for m in reports.by_model(session)
     ]
-    return "Fleet by model", "What you have and what it maps to", columns, data
+    return "Inventory by model", "What you have and what it maps to", columns, data
 
 
 def _unused_phones(session: Session):

@@ -78,7 +78,7 @@ def run_sync(settings: Settings | None = None) -> int:
             devices = ris.fetch_all()
             for dname, dev in devices.items():
                 ris_devices[dname] = (dev, conn.name)
-            _set_stage(run_id, f"scraping phones ({conn.name})",
+            _set_stage(run_id, f"querying phones ({conn.name})",
                        ris_count=len(ris_devices))
 
             if cfg.phone_web_enabled and conn.phone_web_enabled:

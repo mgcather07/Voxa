@@ -50,7 +50,7 @@
             <input type="password" name="cucm_password" placeholder="{{ 'unchanged' if c.cucm_password else 'password' }}" autocomplete="new-password" style="width:130px">
             <input type="text" name="axl_version" value="{{ c.axl_version }}" placeholder="12.5" style="width:64px">
             <label class="chk"><input type="checkbox" name="verify_tls" {{ 'checked' if c.verify_tls }}> TLS</label>
-            <label class="chk"><input type="checkbox" name="phone_web_enabled" {{ 'checked' if c.phone_web_enabled }}> Scrape</label>
+            <label class="chk"><input type="checkbox" name="phone_web_enabled" {{ 'checked' if c.phone_web_enabled }}> Query phones</label>
             <button class="btn btn-secondary" type="submit" style="min-height:32px;padding:0 12px">Save &amp; retest</button>
           </div>
         </form>
@@ -99,7 +99,7 @@
       <input type="password" name="cucm_password" placeholder="password" autocomplete="new-password" style="width:150px">
       <input type="text" name="axl_version" placeholder="12.5" value="12.5" style="width:64px">
       <label class="chk"><input type="checkbox" name="verify_tls"> TLS</label>
-      <label class="chk"><input type="checkbox" name="phone_web_enabled" checked> Scrape</label>
+      <label class="chk"><input type="checkbox" name="phone_web_enabled" checked> Query phones</label>
       <button class="btn btn-primary" type="submit">Add cluster</button>
     </form>
     <div class="footnote"><span>Add the <strong>publisher</strong> only — AXL runs there and RisPort returns cluster-wide registration, so one connection covers the whole cluster. Subscribers are <strong>discovered</strong> (listed under each cluster), not added separately. The service account needs Standard AXL API Access + the read-only CCM/Serviceability roles. Passwords are masked and never shown back.</span></div>
