@@ -24,3 +24,7 @@ dist/
 .idea/
 .vscode/
 *.swp
+
+# Local CDR/CMR drop dir (sample + real files)
+cdr-inbox/*
+!cdr-inbox/.gitkeep

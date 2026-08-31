@@ -36,6 +36,9 @@ services:
       MOCK_MODE: "true"           # never call a real CUCM from a dev box
       SECRET_KEY: dev-only-insecure
       APP_NAME: Voxa
+      # Where CDR/CMR files land for the ingest (scripts/ingest_cdr.py). In prod
+      # this is the SFTP drop dir CUCM's Billing Application Server pushes to.
+      CDR_DIR: /var/lib/voxa/cdr
       # Colima's virtiofs mount doesn't deliver inotify events, so uvicorn's
       # --reload must poll for changes or .py edits won't restart the worker.
       WATCHFILES_FORCE_POLLING: "true"
@@ -44,6 +47,9 @@ services:
       - ./app:/srv/app/app
       - ./config:/srv/app/config
       - ./scripts:/srv/app/scripts
+      # CDR/CMR drop folder: put files in ./cdr-inbox on the host, then run
+      # `docker compose -f docker-compose.dev.yml exec app python scripts/ingest_cdr.py`.
+      - ./cdr-inbox:/var/lib/voxa/cdr
     ports:
       - "8000:8000"
     depends_on:
