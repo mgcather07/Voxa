@@ -168,7 +168,8 @@ app/
   main.py         FastAPI routes
 config/models.yaml   the file you will edit most
 deploy/           nginx config, systemd unit, TLS certs (gitignored)
-docs/             ARCHITECTURE, CUCM-SETUP, DEPLOY, ROADMAP
+docs/             ARCHITECTURE, CUCM-SETUP, DEPLOY, ROADMAP,
+                  CONNECT-LIVE (point Voxa at a real cluster), FEATURE-PLAN
 scripts/
   test_cucm.py    connectivity and permissions check
   mock_data.py    seed data, no CUCM required

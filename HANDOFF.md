@@ -2,7 +2,12 @@
 
 > **Purpose of this file:** the single "where are we / what's going on" doc.
 > Read this first when picking the project up on another machine. Last
-> updated **2026-08-30**.
+> updated **2026-08-31**.
+
+> 🔌 **Connecting to a live CUCM cluster from the MacBook Pro?**
+> Follow **[docs/CONNECT-LIVE.md](docs/CONNECT-LIVE.md)** — it deploys Voxa in
+> Docker and walks through pointing it at a real (CUCM 15) publisher over VPN,
+> step by step. That is the current task.
 
 ---
 

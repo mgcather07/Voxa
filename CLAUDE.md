@@ -169,27 +169,33 @@ Secrets live in `.env.prod` on the VM, `chmod 600`, never committed.
 
 ---
 
-## Current state
+## Current state (2026-08-31)
 
-Working: collection from all three sources, dashboard, filterable phone table
-with inline swap-status tracking, refresh plan with per-site quantities, PoE
-budget per switch, CSV export, local auth, Docker/nginx deployment.
+The original roadmap is **built** — see [docs/FEATURE-PLAN.md](docs/FEATURE-PLAN.md)
+for the full, phased list (all ✅), verified in the local Docker stack. In brief:
 
-Not built yet, in the order they were prioritized:
+- **Fleet:** dashboard, filterable phone table with inline swap tracking,
+  **Phone 360** device page, **change history + fleet trend**, CSV import.
+- **Telemetry (CDR/CMR):** raw call-record store, **call search**,
+  **cradle-to-grave trace with a SIP ladder diagram**, **call analytics**, and
+  **concurrency/capacity** (Erlangs, per-trunk utilization).
+- **Project:** refresh plan, PoE budget (with SNMP real-draw), **E911 locations**,
+  and a **reports engine** (CSV / XLSX / print-to-PDF).
+- **System:** a read-only **JSON API** (`/api/v1`, token auth), **opt-in
+  webhooks** (off by default), and an **enterprise Settings page**.
 
-1. **Scheduled collection + change history** — nightly sync, and a row per
-   phone per run so the tool can answer "what moved, what dropped off, what
-   appeared". This is the feature that turns a migration tool into something
-   the team keeps using afterward.
-2. **SNMP polling of access switches** — real PoE draw and actual available
-   budget per switch, replacing class-ceiling estimates. Also fills in
-   switch/port for phones whose web server is disabled.
-3. **CDR/CMR ingest** — SFTP endpoint for CUCM's Billing Application Server
-   push, giving call volume per device: which phones nobody uses and therefore
-   don't need replacing.
+**Configuration is now DB-backed, not `.env`.** CUCM clusters and all
+operational settings (SNMP, LDAP, CDR dir, scrape tuning, app name) are edited in
+**Settings** (`/settings`, admin) via `app/settings_store.py` — DB overrides env.
+Only bootstrap values (DATABASE_URL, SECRET_KEY, AUTH_DISABLED) stay in env. The
+collector iterates the clusters configured there. Optional deps (`ldap3`,
+`pysnmp`) live in `requirements-ldap.txt` / `requirements-snmp.txt`, not the base.
 
-`docs/ROADMAP.md` has the design sketch, schema changes, and gotchas for each.
-Start there rather than designing from scratch.
+**Current task:** validate a live CUCM connection — see
+[docs/CONNECT-LIVE.md](docs/CONNECT-LIVE.md).
+
+Read [docs/ROADMAP.md](docs/ROADMAP.md) only for the original design sketches; the
+work it describes is largely done.
 
 There are no tests yet. That was a deliberate deprioritization, not an
 oversight — if you add non-trivial parsing logic, a fixture-based test for it
