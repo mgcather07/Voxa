@@ -6,11 +6,9 @@
 <div class="section">
 
   {% if saved %}
-  <div class="readonly" style="border-color:var(--ok, #2f9e56)">
-    <div class="readonly-body" style="display:flex;gap:8px;align-items:center">
-      <span class="pill current">saved</span>
-      <span>Catalog updated and re-applied across your inventory.</span>
-    </div>
+  <div class="cat-flash">
+    <span class="pill current">saved</span>
+    <span>Catalog updated and re-applied across your inventory.</span>
   </div>
   {% endif %}
 
@@ -18,79 +16,80 @@
     <div class="card-head">
       <h2>Model catalog</h2>
       <span class="subhead">PoE class, lifecycle and replacement for every model in your
-        inventory. Edits save to the database and override
-        <code>config/models.yaml</code> — no server file editing. Saving re-applies
-        to the dashboard, refresh plan and PoE budget immediately.</span>
+        inventory. Edits are stored in the database and override the shipped defaults —
+        no server files to touch. Saving re-applies across the dashboard, refresh plan
+        and PoE budget right away.</span>
     </div>
 
     {% if not rows %}
     <div class="empty">
       <h2>Nothing to edit yet</h2>
-      <p>Run a collection first — the catalog lists the models actually present in
-        your cluster.</p>
+      <p>Run a collection first — the catalog lists the models actually present in your
+        cluster.</p>
     </div>
     {% else %}
     <form method="post" action="/catalog">
-      <div style="overflow-x:auto">
-      <table class="grid" style="width:100%;border-collapse:collapse">
-        <thead>
-          <tr style="text-align:left;color:var(--ink-3);font-size:13px">
-            <th style="padding:8px 10px">Model</th>
-            <th style="padding:8px 10px">In service</th>
-            <th style="padding:8px 10px">PoE class</th>
-            <th style="padding:8px 10px">Lifecycle</th>
-            <th style="padding:8px 10px">Replacement</th>
-            <th style="padding:8px 10px">Verified</th>
-            <th style="padding:8px 10px">Source</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for r in rows %}
-          <tr style="border-top:1px solid var(--hairline)">
-            <input type="hidden" name="model_key" value="{{ r.key }}">
-            <td style="padding:8px 10px">
-              <strong>{{ r.key }}</strong>
-              <div class="meta" style="color:var(--ink-3)">{{ r.model_raw }}</div>
-            </td>
-            <td style="padding:8px 10px" class="tnum">{{ r.count }}</td>
-            <td style="padding:8px 10px">
-              <select name="poe_class__{{ r.key }}">
-                {% for c, watts in poe_classes %}
-                <option value="{{ c }}" {{ 'selected' if c == r.poe_class }}>Class {{ c }} · {{ '%.2f'|format(watts) }} W</option>
-                {% endfor %}
-              </select>
-            </td>
-            <td style="padding:8px 10px">
-              <select name="lifecycle__{{ r.key }}">
-                {% for key, label in lifecycle_options %}
-                <option value="{{ key }}" {{ 'selected' if key == r.lifecycle }}>{{ label }}</option>
-                {% endfor %}
-              </select>
-            </td>
-            <td style="padding:8px 10px">
-              <select name="replacement__{{ r.key }}">
-                <option value="none" {{ 'selected' if r.replacement == 'none' }}>— No replacement —</option>
-                {% for key, name in replacement_options %}
-                <option value="{{ key }}" {{ 'selected' if key == r.replacement }}>{{ name }}</option>
-                {% endfor %}
-              </select>
-            </td>
-            <td style="padding:8px 10px">
-              <label class="chk"><input type="checkbox" name="verified__{{ r.key }}" {{ 'checked' if r.verified }}></label>
-            </td>
-            <td style="padding:8px 10px">
-              {% if r.overridden %}
-              <span class="pill current" title="Edited here; overrides the YAML default">edited</span>
-              {% else %}
-              <span class="meta" style="color:var(--ink-3)" title="Shipped default from config/models.yaml">default</span>
-              {% endif %}
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
+      <div class="cat-wrap">
+        <table class="grid-table cat-table">
+          <thead>
+            <tr>
+              <th>Model</th>
+              <th>Name</th>
+              <th class="num">In service</th>
+              <th>PoE class</th>
+              <th>Lifecycle</th>
+              <th>Replacement</th>
+              <th>Verified</th>
+              <th>Source</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for r in rows %}
+            <tr>
+              <td class="device">
+                <input type="hidden" name="model_key" value="{{ r.key }}">{{ r.key }}
+              </td>
+              <td class="desc">{{ r.model_raw }}</td>
+              <td class="num">{{ r.count }}</td>
+              <td>
+                <select class="filter-select" name="poe_class__{{ r.key }}">
+                  {% for c, watts in poe_classes %}
+                  <option value="{{ c }}" {{ 'selected' if c == r.poe_class }}>Class {{ c }} · {{ '%.2f'|format(watts) }} W</option>
+                  {% endfor %}
+                </select>
+              </td>
+              <td>
+                <select class="filter-select" name="lifecycle__{{ r.key }}">
+                  {% for key, label in lifecycle_options %}
+                  <option value="{{ key }}" {{ 'selected' if key == r.lifecycle }}>{{ label }}</option>
+                  {% endfor %}
+                </select>
+              </td>
+              <td>
+                <select class="filter-select" name="replacement__{{ r.key }}">
+                  <option value="none" {{ 'selected' if r.replacement == 'none' }}>No replacement</option>
+                  {% for key, name in replacement_options %}
+                  <option value="{{ key }}" {{ 'selected' if key == r.replacement }}>{{ name }}</option>
+                  {% endfor %}
+                </select>
+              </td>
+              <td>
+                <label class="chk"><input type="checkbox" name="verified__{{ r.key }}" {{ 'checked' if r.verified }}></label>
+              </td>
+              <td>
+                {% if r.overridden %}
+                <span class="pill current" title="Edited here — overrides the shipped default">edited</span>
+                {% else %}
+                <span class="pill unknown" title="Shipped default from the model catalog">default</span>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
       </div>
-      <div style="margin-top:16px;display:flex;gap:12px;align-items:center">
+
+      <div class="cat-actions">
         <button class="btn btn-primary" type="submit">Save catalog</button>
         <span class="subhead">Setting a row back to its shipped values clears the override.</span>
       </div>

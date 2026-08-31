@@ -1464,6 +1464,31 @@ td.delta.zero { color: var(--ink-3); }
   .footer { padding: 0 16px 20px; }
 }
 
+/* ---------------------------------------------------------------------------
+   Model catalog — the editable model table
+   --------------------------------------------------------------------------- */
+.cat-flash {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--ink-2);
+}
+.cat-wrap { overflow-x: auto; margin-top: 4px; }
+.cat-table td { white-space: nowrap; vertical-align: middle; }
+.cat-table .device { font-size: 13px; font-weight: 600; }
+.cat-table .desc { color: var(--ink-2); }
+.cat-table select.filter-select { width: 100%; min-width: 150px; }
+.cat-table td:nth-child(6) select.filter-select { min-width: 210px; }
+.cat-table .chk { justify-content: center; width: 100%; }
+.cat-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 16px;
+  flex-wrap: wrap;
+}
+
 @media (prefers-reduced-motion: reduce) {
   * { animation: none !important; transition: none !important; }
 }
