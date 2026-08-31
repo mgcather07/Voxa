@@ -28,7 +28,10 @@ SELECT FIRST {limit}
        tm.name AS model,
        tp.name AS protocol,
        dp.name AS device_pool,
-       d.loadinformation AS load_information,
+       -- CUCM 15's device table has no `loadinformation` column; the per-device
+       -- firmware-load override lives in `specialloadinformation` (blank unless
+       -- an admin overrides the model default). Running load comes from RisPort.
+       d.specialloadinformation AS load_information,
        np.dnorpattern AS directory_number
   FROM device AS d
   LEFT JOIN typemodel AS tm ON tm.enum = d.tkmodel

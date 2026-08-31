@@ -35,9 +35,14 @@ ENVELOPE = """<?xml version="1.0" encoding="UTF-8"?>
         <soap:Status>Any</soap:Status>
         <soap:NodeName></soap:NodeName>
         <soap:SelectBy>Name</soap:SelectBy>
+        <!-- "Match all devices" is an EMPTY Item, not "*". CUCM 15's RISService70
+             rejects a bare wildcard ("SelectItems cannot contain *"), and both an
+             empty <SelectItems> container ("cannot be null") and an omitted one
+             (ADB parse error) fault too. An empty Item returns the whole fleet;
+             fetch_all() then pages past the 1000/reply cap via StateInfo. -->
         <soap:SelectItems>
           <soap:item>
-            <soap:Item>*</soap:Item>
+            <soap:Item></soap:Item>
           </soap:item>
         </soap:SelectItems>
         <soap:Protocol>Any</soap:Protocol>
