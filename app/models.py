@@ -138,6 +138,39 @@ class User(Base):
         return f"<User {self.username} source={self.source} admin={self.is_admin}>"
 
 
+class Location(Base):
+    """A dispatchable location for E911. Voxa-owned data (never from CUCM)."""
+
+    __tablename__ = "locations"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(128))
+    address: Mapped[str | None] = mapped_column(String(255))
+    notes: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow
+    )
+
+
+class LocationRule(Base):
+    """Maps discovered data (switch name prefix or IP subnet) to a Location.
+
+    match_type is "switch" (pattern is a switch-name prefix, e.g. `hq-acc`) or
+    "subnet" (pattern is a CIDR like `10.20.1.0/24`, or an IP prefix). The most
+    specific rule — longest pattern — wins.
+    """
+
+    __tablename__ = "location_rules"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    location_id: Mapped[int] = mapped_column(Integer, index=True)
+    match_type: Mapped[str] = mapped_column(String(16))
+    pattern: Mapped[str] = mapped_column(String(128))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow
+    )
+
+
 class SyncRun(Base):
     __tablename__ = "sync_runs"
 

@@ -16,7 +16,13 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from app.catalog import get_catalog  # noqa: E402
 from app.db import init_db, session_scope  # noqa: E402
-from app.models import Phone, PhoneSnapshot, SyncRun  # noqa: E402
+from app.models import (  # noqa: E402
+    Location,
+    LocationRule,
+    Phone,
+    PhoneSnapshot,
+    SyncRun,
+)
 
 # How many historical collection runs to fabricate, so change history and the
 # fleet trend have something to show without a live CUCM.
@@ -82,6 +88,8 @@ def main() -> None:
     with session_scope() as session:
         if wipe:
             session.query(PhoneSnapshot).delete()
+            session.query(LocationRule).delete()
+            session.query(Location).delete()
             session.query(Phone).delete()
             session.query(SyncRun).delete()
 
@@ -163,8 +171,31 @@ def main() -> None:
             created_phones.append(phone)
 
         _seed_history(session, created_phones, now)
+        _seed_locations(session)
 
     print(f"Seeded {count} mock phones across {len(SITES)} sites.")
+
+
+SITE_ADDRESSES = {
+    "HQ": "100 Main St, Nashville TN 37201",
+    "PLANT1": "200 Industrial Way, Memphis TN 38103",
+    "PLANT2": "450 Factory Rd, Chattanooga TN 37402",
+    "WAREHOUSE": "12 Dock Ave, Knoxville TN 37902",
+    "REMOTE": "Remote / VPN — no fixed address",
+}
+
+
+def _seed_locations(session) -> None:
+    """One dispatchable location per site, mapped by its switch-name prefix."""
+    for site in SITES:
+        loc = Location(name=f"{site} — main", address=SITE_ADDRESSES.get(site))
+        session.add(loc)
+        session.flush()
+        session.add(
+            LocationRule(
+                location_id=loc.id, match_type="switch", pattern=f"{site.lower()}-acc"
+            )
+        )
 
 
 def _older_firmware(load: str | None) -> str:

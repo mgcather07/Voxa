@@ -24,7 +24,7 @@ from sqlalchemy import desc, func, or_, select
 from sqlalchemy.orm import Session
 from starlette.middleware.sessions import SessionMiddleware
 
-from . import history, reports
+from . import history, locations, reports
 from .catalog import DEFAULT_FAMILY, FAMILIES, get_catalog
 from .auth import (
     RedirectToLogin,
@@ -36,7 +36,14 @@ from .auth import (
 )
 from .config import get_settings
 from .db import get_session, init_db
-from .models import SWAP_STATUSES, Phone, SyncRun, User
+from .models import (
+    SWAP_STATUSES,
+    Location,
+    LocationRule,
+    Phone,
+    SyncRun,
+    User,
+)
 from .models import utcnow
 from .sync import run_sync
 
@@ -355,9 +362,13 @@ def phone_detail(
     # Catalog facts (replacement role/requirements, PoE) for the planning card.
     info = get_catalog().lookup(phone.model_raw)
     timeline = history.device_timeline(session, phone.device_name)
+    location = locations.resolve_phone(session, phone)
     return templates.TemplateResponse(
         "phone_detail.html",
-        _ctx(request, session, user, phone=phone, info=info, timeline=timeline),
+        _ctx(
+            request, session, user,
+            phone=phone, info=info, timeline=timeline, location=location,
+        ),
     )
 
 
@@ -377,6 +388,130 @@ def history_page(
     return templates.TemplateResponse(
         "history.html",
         _ctx(request, session, user, runs=runs, diff=diff, trend=trend, selected=run),
+    )
+
+
+# ---------------------------------------------------------------------------
+# E911 locations
+# ---------------------------------------------------------------------------
+@app.get("/locations", response_class=HTMLResponse)
+def locations_page(
+    request: Request,
+    session: Session = Depends(get_session),
+    user: User = Depends(require_user),
+):
+    return templates.TemplateResponse(
+        "locations.html",
+        _ctx(
+            request, session, user,
+            entries=locations.location_list(session),
+            coverage=locations.coverage(session),
+            match_types=locations.MATCH_TYPES,
+        ),
+    )
+
+
+@app.post("/locations")
+def location_add(
+    name: str = Form(...),
+    address: str = Form(""),
+    notes: str = Form(""),
+    session: Session = Depends(get_session),
+    user: User = Depends(require_user),
+):
+    if name.strip():
+        session.add(
+            Location(
+                name=name.strip(),
+                address=address.strip() or None,
+                notes=notes.strip() or None,
+            )
+        )
+        session.commit()
+    return RedirectResponse(url="/locations", status_code=303)
+
+
+@app.post("/locations/{location_id}/rules")
+def location_rule_add(
+    location_id: int,
+    match_type: str = Form(...),
+    pattern: str = Form(...),
+    session: Session = Depends(get_session),
+    user: User = Depends(require_user),
+):
+    if (
+        session.get(Location, location_id)
+        and match_type in locations.MATCH_TYPES
+        and pattern.strip()
+    ):
+        session.add(
+            LocationRule(
+                location_id=location_id,
+                match_type=match_type,
+                pattern=pattern.strip(),
+            )
+        )
+        session.commit()
+    return RedirectResponse(url="/locations", status_code=303)
+
+
+@app.post("/locations/rules/{rule_id}/delete")
+def location_rule_delete(
+    rule_id: int,
+    session: Session = Depends(get_session),
+    user: User = Depends(require_user),
+):
+    rule = session.get(LocationRule, rule_id)
+    if rule:
+        session.delete(rule)
+        session.commit()
+    return RedirectResponse(url="/locations", status_code=303)
+
+
+@app.post("/locations/{location_id}/delete")
+def location_delete(
+    location_id: int,
+    session: Session = Depends(get_session),
+    user: User = Depends(require_user),
+):
+    loc = session.get(Location, location_id)
+    if loc:
+        for rule in session.scalars(
+            select(LocationRule).where(LocationRule.location_id == location_id)
+        ).all():
+            session.delete(rule)
+        session.delete(loc)
+        session.commit()
+    return RedirectResponse(url="/locations", status_code=303)
+
+
+@app.get("/locations/e911.csv")
+def locations_export(
+    session: Session = Depends(get_session),
+    user: User = Depends(require_user),
+):
+    resolved = locations.resolve_all(session)
+    phones = session.scalars(
+        select(Phone).order_by(Phone.site, Phone.device_name)
+    ).all()
+    buffer = io.StringIO()
+    writer = csv.writer(buffer)
+    writer.writerow(
+        ["device_name", "directory_number", "ip_address", "switch_name",
+         "switch_port", "site", "location", "address"]
+    )
+    for phone in phones:
+        loc = resolved.get(phone.id)
+        writer.writerow([
+            phone.device_name, phone.directory_number, phone.ip_address,
+            phone.switch_name, phone.switch_port, phone.site,
+            loc.name if loc else "", loc.address if loc else "",
+        ])
+    buffer.seek(0)
+    return StreamingResponse(
+        iter([buffer.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": 'attachment; filename="voxa-e911.csv"'},
     )
 
 

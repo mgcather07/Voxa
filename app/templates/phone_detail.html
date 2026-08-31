@@ -77,6 +77,11 @@
         <span class="k">Web access</span>
         <span class="v">{% if phone.web_reachable %}<span style="color:var(--green)">reachable</span>{% else %}<span class="none">unreachable / disabled</span>{% endif %}</span>
       </div>
+      <div class="kv-row">
+        <span class="k">E911 location</span>
+        {% if location %}<span class="v"><a href="/locations">{{ location.name }}</a>{% if location.address %} <span style="color:var(--ink-3)">· {{ location.address }}</span>{% endif %}</span>
+        {% else %}<span class="v none">unmapped</span>{% endif %}
+      </div>
     </div>
   </div>
 

@@ -791,6 +791,65 @@ td.device a:hover { color: var(--blue-bright); }
 .kv-row .v.none { color: var(--ink-3); }
 
 /* ===========================================================================
+   E911 locations
+   ========================================================================== */
+.loc-form, .rule-form {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.loc-form input, .rule-form input, .rule-form select {
+  background: var(--surface-1);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-md);
+  padding: 9px 12px;
+  color: var(--ink-1);
+  font-size: 13.5px;
+  outline: none;
+}
+.loc-form input { flex: 1 1 200px; }
+.rule-form input { flex: 1 1 240px; }
+.loc-form input:focus, .rule-form input:focus, .rule-form select:focus {
+  border-color: color-mix(in srgb, var(--blue) 60%, transparent);
+}
+.loc-count { margin-left: auto; font-size: 12.5px; font-weight: 700; color: var(--ink-2); }
+.linkbtn {
+  background: none;
+  border: none;
+  color: var(--ink-3);
+  cursor: pointer;
+  font-size: 12.5px;
+  padding: 2px 6px;
+}
+.linkbtn:hover { color: var(--ink-1); }
+.linkbtn.danger:hover { color: var(--red); }
+
+.rule-list { display: flex; flex-direction: column; gap: 6px; }
+.rule {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 10px;
+  background: var(--surface-inset);
+  border: 1px solid var(--hairline-soft);
+  border-radius: var(--radius-md);
+  font-size: 12.5px;
+}
+.rule .rule-type {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: var(--blue);
+  background: color-mix(in srgb, var(--blue) 14%, transparent);
+  border-radius: 999px;
+  padding: 2px 8px;
+}
+.rule form { margin-left: auto; display: contents; }
+.rule .linkbtn { margin-left: auto; }
+
+/* ===========================================================================
    Change history
    ========================================================================== */
 .trend {

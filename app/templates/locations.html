@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% block title %}E911 locations &middot; {{ settings.app_name }}{% endblock %}
+{% block page_title %}E911 locations{% endblock %}
+{% block content %}
+
+<div class="section">
+
+  <div class="tiles">
+    <div class="tile">
+      <div class="label">Locations</div>
+      <div class="value-row"><span class="value tnum">{{ entries|length }}</span></div>
+      <div class="note">defined dispatchable locations</div>
+    </div>
+    <div class="tile">
+      <div class="label">Phones mapped</div>
+      <div class="value-row">
+        <span class="value tnum" style="color:var(--cyan)">{{ coverage.pct }}%</span>
+      </div>
+      <div class="progress"><span style="width: {{ coverage.pct }}%; background: var(--cyan)"></span></div>
+      <div class="note">{{ coverage.resolved }} of {{ coverage.total }} resolve to a location</div>
+    </div>
+    <div class="tile" style="justify-content:space-between">
+      <div class="label">E911 record</div>
+      <a class="btn btn-secondary" href="/locations/e911.csv" style="align-self:flex-start">Export E911 CSV</a>
+      <div class="note">device · DN · IP · switch/port · location</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <h2>Add a location</h2>
+      <span class="subhead">a place; map switches or subnets to it below</span>
+    </div>
+    <form class="loc-form" method="post" action="/locations">
+      <input type="text" name="name" placeholder="Name (e.g. HQ — 2nd floor east)" required>
+      <input type="text" name="address" placeholder="Dispatchable address (optional)">
+      <input type="text" name="notes" placeholder="Notes (optional)">
+      <button type="submit" class="btn btn-primary">Add location</button>
+    </form>
+  </div>
+
+  {% if not entries %}
+  <div class="card"><div class="empty">
+    No locations yet. Add one above, then map a switch prefix (e.g.
+    <code>hq-acc</code>) or a subnet (e.g. <code>10.20.1.0/24</code>) to it.
+  </div></div>
+  {% endif %}
+
+  {% for e in entries %}
+  <div class="card">
+    <div class="card-head">
+      <h2>{{ e.location.name }}</h2>
+      <span class="subhead">{{ e.location.address or "no address" }}</span>
+      <span class="loc-count tnum">{{ e.phone_count }} phones</span>
+      <form method="post" action="/locations/{{ e.location.id }}/delete"
+            onsubmit="return confirm('Delete this location and its rules?')">
+        <button class="linkbtn danger" type="submit">Delete</button>
+      </form>
+    </div>
+
+    <div class="rule-list">
+      {% for r in e.rules %}
+      <div class="rule">
+        <span class="rule-type">{{ r.match_type }}</span>
+        <span class="mono">{{ r.pattern }}</span>
+        <form method="post" action="/locations/rules/{{ r.id }}/delete">
+          <button class="linkbtn" type="submit" title="Remove rule">✕</button>
+        </form>
+      </div>
+      {% else %}
+      <div class="muted" style="font-size:12.5px">No rules yet — nothing maps here.</div>
+      {% endfor %}
+    </div>
+
+    <form class="rule-form" method="post" action="/locations/{{ e.location.id }}/rules">
+      <select name="match_type">
+        {% for mt in match_types %}<option value="{{ mt }}">{{ mt }}</option>{% endfor %}
+      </select>
+      <input type="text" name="pattern" placeholder="switch prefix or subnet CIDR" required>
+      <button type="submit" class="btn btn-secondary">Add rule</button>
+    </form>
+  </div>
+  {% endfor %}
+
+</div>
+{% endblock %}

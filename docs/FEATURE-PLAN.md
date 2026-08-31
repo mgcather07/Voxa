@@ -40,16 +40,16 @@ so no in-app scheduler dependency.
 - ✅ Fleet-health trend on the History page
 - ✅ `scripts/mock_data.py` fabricates 6 runs of history
 
-## Phase 3 — E911 / location mapping  ⬜
+## Phase 3 — E911 / location mapping  ✅
 Call Telemetry leans hard on this; Voxa roadmap #5. We already discover
 switch/port/subnet — the hard half. Writes only to Voxa's own DB.
 
-- ⬜ `Location` model (name, dispatchable address, notes)
-- ⬜ Mapping rules: switch/port and/or subnet → location
-- ⬜ Resolve per-phone location (at sync or on read)
-- ⬜ Locations page (list + add/edit mappings)
-- ⬜ Phone 360 shows resolved location
-- ⬜ E911 CSV export
+- ✅ `Location` model (name, dispatchable address, notes)
+- ✅ Mapping rules: switch-name prefix and/or subnet CIDR → location
+- ✅ Resolve per-phone location on read (`app/locations.py`, most-specific wins)
+- ✅ Locations page (list + add location + add/remove rules + coverage %)
+- ✅ Phone 360 shows resolved location
+- ✅ E911 CSV export (`/locations/e911.csv`)
 
 ## Phase 4 — Reporting upgrades  ⬜
 Call Telemetry's report templates + exports. *Deps: openpyxl (XLSX), and PDF
