@@ -99,6 +99,38 @@
 </div>
 {% endif %}
 
+{% if nodes %}
+<div class="card">
+  <div class="card-head">
+    <h2>Cluster nodes</h2>
+    <span class="subhead">topology from CUCM — devices registered to each node</span>
+  </div>
+  <div style="overflow-x:auto">
+    <table class="grid-table">
+      <thead>
+        <tr><th>Node</th><th>Description</th><th>Type</th><th class="num">Registered</th></tr>
+      </thead>
+      <tbody>
+        {% for n in nodes %}
+        <tr>
+          <td class="device">{{ n.name }}</td>
+          <td class="desc">{{ n.description or "—" }}</td>
+          <td>
+            {% if 'Presence' in (n.role or '') %}
+            <span class="pill unknown">IM&amp;P</span>
+            {% else %}
+            <span class="pill current">Voice/Video</span>
+            {% endif %}
+          </td>
+          <td class="num">{{ n.registered_devices | comma }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
 <div class="grid dash-two">
   <div class="card">
     <div class="card-head">

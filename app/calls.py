@@ -178,7 +178,8 @@ def _dur(seconds) -> str:
     return f"{m}m {s}s" if m else f"{s}s"
 
 
-def build_ladder(legs: list[CallRecord], device_info: dict | None = None) -> dict | None:
+def build_ladder(legs: list[CallRecord], device_info: dict | None = None,
+                 node_desc: dict | None = None) -> dict | None:
     """Build a SIP-style ladder (sequence diagram) of a call's signalling.
 
     Lifelines are the parties plus the CallManager they route through; arrows
@@ -192,6 +193,7 @@ def build_ladder(legs: list[CallRecord], device_info: dict | None = None) -> dic
     cucm_key = f"__cucm__{mgr}"
 
     device_info = device_info or {}
+    node_desc = node_desc or {}
     # Best IP per device: prefer the address recorded in the CDR leg, fall back
     # to the phone's current registration IP from inventory.
     cdr_ip: dict[str, str] = {}
@@ -224,8 +226,13 @@ def build_ladder(legs: list[CallRecord], device_info: dict | None = None) -> dic
         key = cucm_key if cucm else (device or number or "?")
         if key not in meta:
             if cucm:
-                meta[key] = {"label": f"CUCM {mgr}",
-                             "sub": cm_node or "CallManager", "ip": ""}
+                friendly = node_desc.get(cm_node) if cm_node else None
+                # Prefer the node's human name; drop its IP/hostname to line 3.
+                meta[key] = {
+                    "label": f"CUCM {mgr}",
+                    "sub": friendly or cm_node or "CallManager",
+                    "ip": cm_node if friendly else "",
+                }
             else:
                 meta[key] = {
                     "label": number or device or "?",

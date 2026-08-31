@@ -61,6 +61,7 @@ from .models import (
     CallStat,
     CatalogOverride,
     Cluster,
+    ClusterNode,
     ClusterTestLog,
     Location,
     LocationRule,
@@ -318,6 +319,9 @@ def dashboard(
             unverified=reports.unverified_models(session),
             call_activity=reports.call_activity(session),
             clusters=reports.clusters(session),
+            nodes=session.scalars(
+                select(ClusterNode).order_by(ClusterNode.cluster, ClusterNode.node_id)
+            ).all(),
         ),
     )
 
@@ -1249,7 +1253,13 @@ def call_detail(
             .where(Phone.device_name.in_(dev_names))
         ).all():
             device_info[name] = {"ip": ip, "cm_node": node}
-    ladder = calls.build_ladder(legs, device_info=device_info)
+    # Resolve a ladder CUCM node (an IP/hostname) to its friendly description.
+    node_desc = {
+        n.name: n.description
+        for n in session.scalars(select(ClusterNode)).all()
+        if n.description
+    }
+    ladder = calls.build_ladder(legs, device_info=device_info, node_desc=node_desc)
     return templates.TemplateResponse(
         "call_detail.html",
         _ctx(

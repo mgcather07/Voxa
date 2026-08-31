@@ -264,6 +264,30 @@ class Setting(Base):
     is_secret: Mapped[bool] = mapped_column(Boolean, default=False)
 
 
+class ClusterNode(Base):
+    """A CUCM node discovered from `processnode` at collection time — the cluster
+    topology (publisher / subscribers / IM&P) with each node's registered-device
+    count. Powers the cluster-status view and resolves a ladder node IP to a
+    human name. Read-only; refreshed every collection."""
+
+    __tablename__ = "cluster_nodes"
+    __table_args__ = (
+        UniqueConstraint("cluster", "name", name="uq_cluster_nodes_cluster_name"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    cluster: Mapped[str] = mapped_column(String(64), index=True)
+    # processnode name — an IP or a hostname, exactly as CUCM stores it.
+    name: Mapped[str] = mapped_column(String(128), index=True)
+    description: Mapped[str | None] = mapped_column(String(255))
+    role: Mapped[str | None] = mapped_column(String(64))  # Voice/Video | IM&P
+    node_id: Mapped[int | None] = mapped_column(Integer)
+    registered_devices: Mapped[int] = mapped_column(Integer, default=0)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, onupdate=utcnow
+    )
+
+
 class CatalogOverride(Base):
     """Admin edits to the model catalog, made on the Catalog page. Overrides the
     config/models.yaml defaults per model key (DB wins), so an admin never needs
