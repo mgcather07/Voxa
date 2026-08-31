@@ -288,6 +288,34 @@ class ClusterNode(Base):
     )
 
 
+class Certificate(Base):
+    """A TLS certificate a CUCM node serves on a port, read by a plain TLS
+    handshake (fully read-only — no CUCM API). Refreshed on demand from the
+    Certificates page. One row per (host, port)."""
+
+    __tablename__ = "certificates"
+    __table_args__ = (
+        UniqueConstraint("host", "port", name="uq_certificates_host_port"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    node: Mapped[str | None] = mapped_column(String(255))   # friendly node name
+    host: Mapped[str] = mapped_column(String(128), index=True)
+    port: Mapped[int] = mapped_column(Integer)
+    service: Mapped[str | None] = mapped_column(String(64))  # Tomcat/CallManager…
+    subject_cn: Mapped[str | None] = mapped_column(String(255))
+    issuer_cn: Mapped[str | None] = mapped_column(String(255))
+    self_signed: Mapped[bool] = mapped_column(Boolean, default=False)
+    valid_from: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    valid_to: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    san: Mapped[str | None] = mapped_column(Text)
+    serial: Mapped[str | None] = mapped_column(String(80))
+    error: Mapped[str | None] = mapped_column(String(255))
+    checked_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow
+    )
+
+
 class CatalogOverride(Base):
     """Admin edits to the model catalog, made on the Catalog page. Overrides the
     config/models.yaml defaults per model key (DB wins), so an admin never needs

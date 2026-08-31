@@ -33,6 +33,7 @@ from . import (
     api,
     calls,
     capacity,
+    certs,
     exports,
     history,
     importer,
@@ -60,6 +61,7 @@ from .models import (
     ApiToken,
     CallStat,
     CatalogOverride,
+    Certificate,
     Cluster,
     ClusterNode,
     ClusterTestLog,
@@ -161,6 +163,15 @@ def _hax(h):          # 14 -> "2p", 0 -> "12a"
 templates.env.filters["hclock"] = _hclock
 templates.env.filters["hlabel"] = _hlabel
 templates.env.filters["hax"] = _hax
+
+
+def _days_until(v):   # whole days from now to a datetime; negative if past
+    if v is None:
+        return None
+    return (v - utcnow()).days
+
+
+templates.env.filters["days_until"] = _days_until
 
 
 def _timeago(value) -> str:
@@ -1013,6 +1024,38 @@ async def catalog_save(
     session.commit()            # persist the re-derived phone fields
     log.info("Catalog edited by %s; re-derived %s phones", user.username, n)
     return RedirectResponse(url="/catalog?saved=1", status_code=303)
+
+
+@app.get("/certificates", response_class=HTMLResponse)
+def certificates_page(
+    request: Request,
+    session: Session = Depends(get_session),
+    user: User = Depends(require_admin),
+):
+    cert_rows = session.scalars(
+        select(Certificate).order_by(Certificate.host, Certificate.port)
+    ).all()
+    now = utcnow()
+    valid = [c for c in cert_rows if not c.error and c.valid_to]
+    expired = sum(1 for c in valid if c.valid_to < now)
+    expiring = sum(1 for c in valid if 0 <= (c.valid_to - now).days < 90)
+    last = max((c.checked_at for c in cert_rows), default=None)
+    return templates.TemplateResponse(
+        "certificates.html",
+        _ctx(request, session, user, certs=cert_rows, last_checked=last,
+             expired=expired, expiring=expiring),
+    )
+
+
+@app.post("/certificates/check")
+def certificates_check(
+    session: Session = Depends(get_session),
+    user: User = Depends(require_admin),
+):
+    summary = certs.collect(session)
+    session.commit()
+    log.info("Certificate check by %s: %s", user.username, summary)
+    return RedirectResponse(url="/certificates?checked=1", status_code=303)
 
 
 def _settings_ctx(request, session, user, **extra):
