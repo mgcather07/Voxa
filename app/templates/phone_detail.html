@@ -122,4 +122,19 @@
 
 </div>
 
+{% if timeline %}
+<div class="card">
+  <div class="card-head"><h2>Change history</h2><span class="subhead">from collection snapshots</span></div>
+  <div class="timeline">
+    {% for e in timeline %}
+    <div class="tl-row">
+      <span class="tl-when tnum">{{ e.captured_at.strftime("%Y-%m-%d") if e.captured_at }}</span>
+      <span class="tl-dot"></span>
+      <span class="tl-what">{{ e.changes | join("; ") }}</span>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
 {% endblock %}

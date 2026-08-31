@@ -1,0 +1,19 @@
+# Runs voxa-collect.service every night. Pairs with voxa-collect.service.
+#
+#   sudo systemctl enable --now voxa-collect.timer
+#   systemctl list-timers voxa-collect.timer      # confirm next run
+#
+# Prefer cron? An equivalent host crontab line:
+#   15 2 * * *  cd /opt/voxa && docker compose --env-file .env.prod \
+#     -f docker-compose.prod.yml exec -T app python scripts/collect.py \
+#     >> /var/log/voxa-collect.log 2>&1
+
+[Unit]
+Description=Run Voxa collection nightly
+
+[Timer]
+OnCalendar=*-*-* 02:15:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target

@@ -24,7 +24,7 @@ from sqlalchemy import desc, func, or_, select
 from sqlalchemy.orm import Session
 from starlette.middleware.sessions import SessionMiddleware
 
-from . import reports
+from . import history, reports
 from .catalog import DEFAULT_FAMILY, FAMILIES, get_catalog
 from .auth import (
     RedirectToLogin,
@@ -354,9 +354,29 @@ def phone_detail(
         raise HTTPException(status_code=404, detail="Phone not found")
     # Catalog facts (replacement role/requirements, PoE) for the planning card.
     info = get_catalog().lookup(phone.model_raw)
+    timeline = history.device_timeline(session, phone.device_name)
     return templates.TemplateResponse(
         "phone_detail.html",
-        _ctx(request, session, user, phone=phone, info=info),
+        _ctx(request, session, user, phone=phone, info=info, timeline=timeline),
+    )
+
+
+@app.get("/history", response_class=HTMLResponse)
+def history_page(
+    request: Request,
+    run: int | None = None,
+    session: Session = Depends(get_session),
+    user: User = Depends(require_user),
+):
+    """Change history: what moved, appeared, dropped, re-registered per run."""
+    runs = history.recent_runs(session, limit=30)
+    diff = (
+        history.diff_for_run(session, run) if run else history.latest_diff(session)
+    )
+    trend = history.fleet_trend(session, limit=12) if runs else []
+    return templates.TemplateResponse(
+        "history.html",
+        _ctx(request, session, user, runs=runs, diff=diff, trend=trend, selected=run),
     )
 
 

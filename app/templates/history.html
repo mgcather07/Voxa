@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% block title %}History &middot; {{ settings.app_name }}{% endblock %}
+{% block page_title %}Change history{% endblock %}
+{% block content %}
+
+{% macro change_list(title, items, tone) %}
+{% if items %}
+<div class="change-block">
+  <div class="change-head"><span class="dot {{ tone }}"></span>{{ title }} <span class="n tnum">{{ items|length }}</span></div>
+  <div class="change-rows">
+    {% for name in items[:60] %}
+    <a class="change-row" href="/phones?q={{ name }}"><span class="mono">{{ name }}</span></a>
+    {% endfor %}
+    {% if items|length > 60 %}<div class="change-more">+{{ items|length - 60 }} more</div>{% endif %}
+  </div>
+</div>
+{% endif %}
+{% endmacro %}
+
+{% macro change_pairs(title, items, tone) %}
+{% if items %}
+<div class="change-block">
+  <div class="change-head"><span class="dot {{ tone }}"></span>{{ title }} <span class="n tnum">{{ items|length }}</span></div>
+  <div class="change-rows">
+    {% for it in items[:60] %}
+    <a class="change-row pair" href="/phones?q={{ it.device }}">
+      <span class="mono dev">{{ it.device }}</span>
+      <span class="was">{{ it.was }}</span>
+      <span class="arrow">→</span>
+      <span class="now">{{ it.now }}</span>
+    </a>
+    {% endfor %}
+    {% if items|length > 60 %}<div class="change-more">+{{ items|length - 60 }} more</div>{% endif %}
+  </div>
+</div>
+{% endif %}
+{% endmacro %}
+
+{% if not runs %}
+  <div class="card">
+    <div class="empty">
+      <h2>No collection history yet</h2>
+      <p>History builds up one collection at a time. Run a collection, or seed
+        mock data with <code>python scripts/mock_data.py</code>.</p>
+    </div>
+  </div>
+{% else %}
+
+<div class="section">
+
+  <div class="card">
+    <div class="card-head">
+      <h2>Fleet trend</h2>
+      <span class="subhead">coverage across the last {{ trend|length }} collections</span>
+    </div>
+    <div class="trend">
+      {% set tmax = (trend | map(attribute='total') | max) or 1 %}
+      {% for t in trend %}
+      <div class="trend-col" title="{{ t.total }} phones · {{ t.registered_pct }}% registered">
+        <div class="trend-bar">
+          <div class="fill" style="height: {{ (100 * t.total / tmax) | round | int }}%"></div>
+        </div>
+        <div class="trend-n tnum">{{ t.total }}</div>
+        <div class="trend-day">{{ t.run.finished_at.strftime("%m/%d") if t.run.finished_at }}</div>
+      </div>
+      {% endfor %}
+    </div>
+    <div class="trend-legend">
+      <span>Latest: <b class="tnum">{{ trend[-1].registered_pct }}%</b> registered</span>
+      <span><b class="tnum">{{ trend[-1].serial_pct }}%</b> serial</span>
+      <span><b class="tnum">{{ trend[-1].port_pct }}%</b> switch port</span>
+    </div>
+  </div>
+
+  {% if diff %}
+  <div class="card">
+    <div class="card-head">
+      <h2>What changed</h2>
+      <span class="subhead">
+        {% if diff.previous %}collection {{ diff.current.finished_at.strftime("%b %d %H:%M") if diff.current.finished_at }} vs {{ diff.previous.finished_at.strftime("%b %d %H:%M") if diff.previous.finished_at }}
+        {% else %}first collection — nothing to compare against yet{% endif %}
+      </span>
+      <select class="runpick" onchange="location.href='/history?run='+this.value">
+        {% for r in runs %}
+        <option value="{{ r.id }}" {{ 'selected' if diff.current.id == r.id }}>{{ r.finished_at.strftime("%b %d %H:%M") if r.finished_at else ("run " ~ r.id) }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    {% if diff.total_changes == 0 %}
+      <div class="empty">No changes between these two collections.</div>
+    {% else %}
+    <div class="change-grid">
+      {{ change_list("Appeared", diff.appeared, "green") }}
+      {{ change_list("Dropped off", diff.dropped, "red") }}
+      {{ change_pairs("Moved switch / port", diff.moved, "cyan") }}
+      {{ change_pairs("Registration changed", diff.reg_changed, "yellow") }}
+      {{ change_pairs("Firmware changed", diff.firmware_changed, "blue") }}
+    </div>
+    {% endif %}
+  </div>
+  {% endif %}
+
+</div>
+
+{% endif %}
+{% endblock %}

@@ -9,14 +9,19 @@ from __future__ import annotations
 
 import random
 import sys
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from app.catalog import get_catalog  # noqa: E402
 from app.db import init_db, session_scope  # noqa: E402
-from app.models import Phone, SyncRun  # noqa: E402
+from app.models import Phone, PhoneSnapshot, SyncRun  # noqa: E402
+
+# How many historical collection runs to fabricate, so change history and the
+# fleet trend have something to show without a live CUCM.
+HISTORY_RUNS = 6
+OLDER_FIRMWARE = "SCCP42.9-3-1SR4-1S"
 
 SITES = {
     "HQ": ("DP_HQ_01", 12),
@@ -76,9 +81,11 @@ def main() -> None:
 
     with session_scope() as session:
         if wipe:
+            session.query(PhoneSnapshot).delete()
             session.query(Phone).delete()
             session.query(SyncRun).delete()
 
+        created_phones: list[Phone] = []
         site_names = list(SITES)
         weights = [SITES[s][1] for s in site_names]
         models = weighted_models(count)
@@ -153,22 +160,102 @@ def main() -> None:
                 last_seen=now,
             )
             session.add(phone)
+            created_phones.append(phone)
 
-        session.add(
-            SyncRun(
-                started_at=now,
-                finished_at=now,
-                status="success",
-                stage="done",
-                axl_count=count,
-                ris_count=count,
-                web_count=sum(1 for m in models if True) // 2,
-                created=count,
-                updated=0,
-            )
-        )
+        _seed_history(session, created_phones, now)
 
     print(f"Seeded {count} mock phones across {len(SITES)} sites.")
+
+
+def _older_firmware(load: str | None) -> str:
+    if load and load != OLDER_FIRMWARE:
+        return OLDER_FIRMWARE
+    return "SCCP42.9-2-1SR1-1S"
+
+
+def _seed_history(session, phones: list[Phone], now: datetime) -> None:
+    """Fabricate HISTORY_RUNS collection runs with per-phone snapshots.
+
+    The newest run mirrors the current fleet exactly; earlier runs have lower
+    discovery coverage (so the trend improves over time), and the run just
+    before the newest carries deliberate, countable changes — a handful of
+    phones that appeared, moved switch port, re-registered, or took a firmware
+    bump — so the "what changed" view has real content.
+    """
+    n = len(phones)
+    late_appear = set(phones[: min(6, n)])          # only in the newest run
+    moved = set(phones[6:16])                        # moved switch port last run
+    reg_flip = set(phones[16:26])                    # were unregistered last run
+    fw_bump = set(phones[26:36])                     # firmware bumped last run
+
+    for r in range(HISTORY_RUNS):
+        newest = r == HISTORY_RUNS - 1
+        frac = (r + 1) / HISTORY_RUNS
+        run_time = now - timedelta(days=(HISTORY_RUNS - 1 - r))
+
+        run = SyncRun(
+            started_at=run_time,
+            finished_at=run_time,
+            status="success",
+            stage="done",
+        )
+        session.add(run)
+        session.flush()  # need run.id
+
+        present = 0
+        with_switch = 0
+        for p in phones:
+            if not newest and p in late_appear:
+                continue  # hadn't appeared yet
+            present += 1
+
+            reg = p.registration_status
+            ip = p.ip_address
+            switch = p.switch_name
+            port = p.switch_port
+            load = p.active_load
+            has_serial = p.serial_number is not None
+
+            if not newest:
+                # Coverage was worse further back in time.
+                if switch and random.random() > (0.55 + 0.45 * frac):
+                    switch, port = None, None
+                if has_serial and random.random() > (0.55 + 0.45 * frac):
+                    has_serial = False
+                if reg == "Registered" and random.random() > (0.9 + 0.1 * frac):
+                    reg, ip = "UnRegistered", None
+
+            # Deliberate, countable changes between the last two runs.
+            if r == HISTORY_RUNS - 2:
+                if p in moved and switch:
+                    port = "GigabitEthernet2/0/1"
+                if p in reg_flip and reg == "Registered":
+                    reg, ip = "UnRegistered", None
+                if p in fw_bump and load:
+                    load = _older_firmware(load)
+
+            if switch:
+                with_switch += 1
+
+            session.add(
+                PhoneSnapshot(
+                    sync_run_id=run.id,
+                    device_name=p.device_name,
+                    registration_status=reg,
+                    ip_address=ip,
+                    switch_name=switch,
+                    switch_port=port,
+                    active_load=load,
+                    has_serial=has_serial,
+                    captured_at=run_time,
+                )
+            )
+
+        run.axl_count = present
+        run.ris_count = present
+        run.web_count = with_switch
+        run.created = present if r == 0 else len(late_appear) if newest else 0
+        run.updated = 0 if r == 0 else present
 
 
 if __name__ == "__main__":

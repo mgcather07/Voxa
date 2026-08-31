@@ -1,0 +1,18 @@
+# Nightly Voxa collection (runs one sync inside the app container, then exits).
+#
+#   sudo cp deploy/voxa-collect.service deploy/voxa-collect.timer /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now voxa-collect.timer
+#
+# Assumes the Docker Compose stack lives in /opt/voxa. Adjust WorkingDirectory
+# and the compose path if you deploy elsewhere.
+
+[Unit]
+Description=Voxa nightly CUCM collection
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/voxa
+ExecStart=/usr/bin/docker compose --env-file .env.prod -f docker-compose.prod.yml exec -T app python scripts/collect.py

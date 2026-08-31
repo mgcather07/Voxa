@@ -212,6 +212,39 @@ user accounts.
 
 ---
 
+## Scheduled collection
+
+Voxa has no built-in scheduler on purpose — the OS is the scheduler, which keeps
+the dependency list short and makes the timing visible to whoever runs the box.
+`scripts/collect.py` runs one collection and exits (non-zero on failure), and
+every run records a per-phone snapshot that powers the **History** page (what
+appeared, moved, dropped, re-registered) and the fleet trend.
+
+Run one now:
+
+```bash
+make collect
+```
+
+Schedule it nightly with the bundled systemd timer:
+
+```bash
+sudo cp deploy/voxa-collect.service deploy/voxa-collect.timer /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now voxa-collect.timer
+systemctl list-timers voxa-collect.timer
+```
+
+Or a host crontab line, if you prefer cron:
+
+```bash
+15 2 * * *  cd /opt/voxa && docker compose --env-file .env.prod \
+  -f docker-compose.prod.yml exec -T app python scripts/collect.py \
+  >> /var/log/voxa-collect.log 2>&1
+```
+
+---
+
 ## Schema changes
 
 `init_db()` calls `create_all()`, which creates missing tables but **does not

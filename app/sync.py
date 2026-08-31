@@ -12,6 +12,7 @@ from .catalog import get_catalog
 from .config import Settings, get_settings
 from .cucm import AxlClient, RisPortClient, fetch_many
 from .db import session_scope
+from .history import record_snapshots
 from .models import Phone, SyncRun
 
 log = logging.getLogger(__name__)
@@ -167,6 +168,10 @@ def run_sync(settings: Settings | None = None) -> int:
                 phone.replacement_name = info.replacement_name
                 phone.replacement_poe_watts = info.replacement_poe_watts
                 phone.last_seen = now
+
+        # --- 5. Snapshot for change history ------------------------------
+        with session_scope() as session:
+            record_snapshots(session, run_id, datetime.now(timezone.utc))
 
         with session_scope() as session:
             run = session.get(SyncRun, run_id)

@@ -89,6 +89,30 @@ class Phone(Base):
     last_seen: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
+class PhoneSnapshot(Base):
+    """One row per phone per collection run — the raw material for change
+    history ("what appeared, moved, dropped, re-registered") and fleet trends.
+    Deliberately narrow: only the fields we diff or trend, keyed by the CUCM
+    device name so it survives a phone row being deleted and re-created."""
+
+    __tablename__ = "phone_snapshots"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    sync_run_id: Mapped[int] = mapped_column(Integer, index=True)
+    device_name: Mapped[str] = mapped_column(String(64), index=True)
+
+    registration_status: Mapped[str | None] = mapped_column(String(32))
+    ip_address: Mapped[str | None] = mapped_column(String(64))
+    switch_name: Mapped[str | None] = mapped_column(String(128))
+    switch_port: Mapped[str | None] = mapped_column(String(64))
+    active_load: Mapped[str | None] = mapped_column(String(128))
+    has_serial: Mapped[bool] = mapped_column(Boolean, default=False)
+
+    captured_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow
+    )
+
+
 class User(Base):
     __tablename__ = "users"
     __table_args__ = (UniqueConstraint("username", name="uq_users_username"),)

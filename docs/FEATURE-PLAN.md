@@ -25,19 +25,20 @@ page with everything Voxa knows about it. No new data, no new deps.
 - ✅ Inline swap-status control on the detail page (reuse `_swap_cell`)
 - ✅ Per-field empty states ("not collected")
 
-## Phase 2 — Scheduled collection + change history  ⬜
+## Phase 2 — Scheduled collection + change history  ✅
 Call Telemetry's "last-registered / last-call activity"; Voxa roadmap #1. Adds
 the time dimension — the feature that makes the tool sticky after the refresh.
-*Dep: a scheduler (prefer stdlib/APScheduler — decide when we start).*
+Scheduling is the OS's job (cron / systemd timer calling `scripts/collect.py`),
+so no in-app scheduler dependency.
 
-- ⬜ Per-phone-per-run snapshot table
-- ⬜ Record snapshots inside `sync.run_sync()`
-- ⬜ Nightly scheduled collection (configurable), single-run guard
-- ⬜ "What changed" view: appeared / dropped / moved switch-port / reg change /
-     firmware change, per run
-- ⬜ Phone 360: that phone's timeline
-- ⬜ Dashboard: fleet-health trend from `SyncRun` history
-- ⬜ Keep `scripts/mock_data.py` working (seed a couple of runs)
+- ✅ Per-phone-per-run snapshot table (`PhoneSnapshot`)
+- ✅ Record snapshots inside `sync.run_sync()`
+- ✅ Scheduled collection via `scripts/collect.py` + systemd timer / cron
+- ✅ "What changed" view: appeared / dropped / moved switch-port / reg change /
+     firmware change, with a run picker
+- ✅ Phone 360: that phone's change timeline
+- ✅ Fleet-health trend on the History page
+- ✅ `scripts/mock_data.py` fabricates 6 runs of history
 
 ## Phase 3 — E911 / location mapping  ⬜
 Call Telemetry leans hard on this; Voxa roadmap #5. We already discover
