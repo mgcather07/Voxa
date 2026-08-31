@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+{% block title %}{{ phone.device_name }} &middot; {{ settings.app_name }}{% endblock %}
+{% block page_title %}Phone 360{% endblock %}
+{% block content %}
+
+<a class="backlink" href="/phones">&larr; Phones</a>
+
+<div class="card detail-head">
+  <div style="min-width:0">
+    <div class="title">{{ phone.device_name }}</div>
+    <div class="desc">{{ phone.description or "No description" }}</div>
+    <div class="tags">
+      <span class="pill {{ phone.lifecycle or 'unknown' }}">{{ phone.lifecycle or "unknown" }}</span>
+      {% if phone.registration_status == "Registered" %}
+        <span class="reg"><span class="dot"></span>registered</span>
+      {% else %}
+        <span class="reg down" title="{{ phone.status_reason or '' }}"><span class="dot"></span>{{ (phone.registration_status or "unknown") | lower }}</span>
+      {% endif %}
+      {% if phone.ip_address %}<span class="mono" style="color:var(--ink-2);font-size:12.5px">{{ phone.ip_address }}</span>{% endif %}
+    </div>
+  </div>
+  <div class="detail-swap">
+    <span class="uplabel">Swap status</span>
+    <div id="swap-{{ phone.id }}">
+      {% include "_swap_cell.html" %}
+    </div>
+  </div>
+</div>
+
+{% macro kv(label, value, mono=False) %}
+<div class="kv-row">
+  <span class="k">{{ label }}</span>
+  {% if value %}<span class="v {{ 'mono' if mono }}">{{ value }}</span>
+  {% else %}<span class="v none">—</span>{% endif %}
+</div>
+{% endmacro %}
+
+<div class="detail-grid">
+
+  <div class="card">
+    <div class="card-head"><h2>Identity</h2><span class="subhead">from AXL</span></div>
+    <div class="kv">
+      {{ kv("Model", phone.model_raw or phone.model_key, mono=True) }}
+      {{ kv("Directory #", phone.directory_number, mono=True) }}
+      {{ kv("Device pool", phone.device_pool) }}
+      {{ kv("Site", phone.site) }}
+      {{ kv("Protocol", phone.protocol) }}
+      {{ kv("Configured load", phone.configured_load, mono=True) }}
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h2>Registration</h2><span class="subhead">from RisPort</span></div>
+    <div class="kv">
+      {{ kv("Status", phone.registration_status) }}
+      {{ kv("Reason", phone.status_reason) }}
+      {{ kv("IP address", phone.ip_address, mono=True) }}
+      {{ kv("Running load", phone.active_load, mono=True) }}
+      {{ kv("CM node", phone.cm_node) }}
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h2>Discovery</h2><span class="subhead">from the phone's web server</span></div>
+    <div class="kv">
+      {{ kv("Serial", phone.serial_number, mono=True) }}
+      {{ kv("Hardware rev", phone.hardware_revision, mono=True) }}
+      <div class="kv-row">
+        <span class="k">Switch / port</span>
+        {% if phone.switch_name %}
+          <span class="v mono" style="color:var(--cyan)">{{ phone.switch_name }}{% if phone.switch_port %} · {{ phone.switch_port }}{% endif %}</span>
+        {% else %}<span class="v none">not reachable</span>{% endif %}
+      </div>
+      {{ kv("Switch IP", phone.switch_ip, mono=True) }}
+      {{ kv("VLAN", phone.vlan_id, mono=True) }}
+      <div class="kv-row">
+        <span class="k">Web access</span>
+        <span class="v">{% if phone.web_reachable %}<span style="color:var(--green)">reachable</span>{% else %}<span class="none">unreachable / disabled</span>{% endif %}</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h2>Refresh planning</h2><span class="subhead">from config/models.yaml</span></div>
+    <div class="kv">
+      {{ kv("Lifecycle", info.lifecycle_label) }}
+      <div class="kv-row">
+        <span class="k">PoE</span>
+        <span class="v tnum">class {{ info.poe_class }} · {{ "%.2f"|format(info.poe_watts) }} W</span>
+      </div>
+      <div class="kv-row">
+        <span class="k">Replaces with</span>
+        {% if info.replacement_name %}<span class="v" style="color:var(--cyan)">{{ info.replacement_name }}</span>
+        {% else %}<span class="v none">no change</span>{% endif %}
+      </div>
+      {% if info.replacement_poe_watts is not none %}
+      <div class="kv-row">
+        <span class="k">Replacement PoE</span>
+        <span class="v tnum">class {{ info.replacement_poe_class }} · {{ "%.2f"|format(info.replacement_poe_watts) }} W</span>
+      </div>
+      {% endif %}
+      {{ kv("Role", info.replacement_role) }}
+      {{ kv("Requires", info.replacement_requires) }}
+      {% if not info.verified %}
+      <div class="kv-row">
+        <span class="k">Catalog</span>
+        <span class="v" style="color:var(--orange)">unverified — confirm against the Cisco data sheet</span>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h2>Record</h2><span class="subhead">Voxa bookkeeping</span></div>
+    <div class="kv">
+      {{ kv("pkid", phone.pkid, mono=True) }}
+      {{ kv("First seen", phone.first_seen.strftime("%Y-%m-%d %H:%M UTC") if phone.first_seen) }}
+      {{ kv("Last seen", phone.last_seen.strftime("%Y-%m-%d %H:%M UTC") if phone.last_seen) }}
+      {{ kv("Notes", phone.notes) }}
+    </div>
+  </div>
+
+</div>
+
+{% endblock %}

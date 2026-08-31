@@ -731,6 +731,66 @@ td.ink2 { color: var(--ink-2); }
 .swap-pill.s-excluded    { color: var(--ink-3);  background: transparent; border-color: var(--hairline-soft); }
 
 /* ===========================================================================
+   Phone 360 detail
+   ========================================================================== */
+.backlink {
+  display: inline-block;
+  font-size: 12.5px;
+  color: var(--ink-2);
+  margin-bottom: -4px;
+}
+.backlink:hover { color: var(--ink-1); }
+
+td.device a { color: var(--ink-1); }
+td.device a:hover { color: var(--blue-bright); }
+
+.detail-head {
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.detail-head .title {
+  font-family: var(--mono);
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.3px;
+}
+.detail-head .desc { font-size: 13.5px; color: var(--ink-2); margin-top: 3px; }
+.detail-head .tags {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+.detail-swap { margin-left: auto; display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+
+.detail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 14px;
+}
+.kv { display: flex; flex-direction: column; gap: 10px; }
+.kv-row {
+  display: grid;
+  grid-template-columns: 132px minmax(0, 1fr);
+  gap: 14px;
+  align-items: baseline;
+  font-size: 13px;
+}
+.kv-row .k {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+.kv-row .v { color: var(--ink-1); overflow-wrap: anywhere; }
+.kv-row .v.mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.kv-row .v.none { color: var(--ink-3); }
+
+/* ===========================================================================
    Refresh plan
    ========================================================================== */
 .buy-tile {

@@ -3,7 +3,7 @@
 {% endif %}
 {% for p in phones %}
 <tr>
-  <td class="device">{{ p.device_name }}</td>
+  <td class="device"><a href="/phones/{{ p.id }}">{{ p.device_name }}</a></td>
   <td class="desc">{{ p.description or "" }}</td>
   <td class="mono">{{ p.directory_number or "" }}</td>
   <td>{{ p.model_raw or p.model_key or "—" }}</td>

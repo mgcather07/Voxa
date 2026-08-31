@@ -8,7 +8,15 @@ import logging
 from datetime import timezone
 from pathlib import Path
 
-from fastapi import BackgroundTasks, Depends, FastAPI, Form, Query, Request
+from fastapi import (
+    BackgroundTasks,
+    Depends,
+    FastAPI,
+    Form,
+    HTTPException,
+    Query,
+    Request,
+)
 from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -17,7 +25,7 @@ from sqlalchemy.orm import Session
 from starlette.middleware.sessions import SessionMiddleware
 
 from . import reports
-from .catalog import DEFAULT_FAMILY, FAMILIES
+from .catalog import DEFAULT_FAMILY, FAMILIES, get_catalog
 from .auth import (
     RedirectToLogin,
     get_backend,
@@ -330,6 +338,25 @@ def update_swap(
     return templates.TemplateResponse(
         "_swap_cell.html",
         {"request": request, "phone": phone, "swap_statuses": SWAP_STATUSES},
+    )
+
+
+@app.get("/phones/{phone_id}", response_class=HTMLResponse)
+def phone_detail(
+    request: Request,
+    phone_id: int,
+    session: Session = Depends(get_session),
+    user: User = Depends(require_user),
+):
+    """Phone 360: everything Voxa knows about one device, read-only."""
+    phone = session.get(Phone, phone_id)
+    if phone is None:
+        raise HTTPException(status_code=404, detail="Phone not found")
+    # Catalog facts (replacement role/requirements, PoE) for the planning card.
+    info = get_catalog().lookup(phone.model_raw)
+    return templates.TemplateResponse(
+        "phone_detail.html",
+        _ctx(request, session, user, phone=phone, info=info),
     )
 
 
