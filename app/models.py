@@ -264,6 +264,29 @@ class Setting(Base):
     is_secret: Mapped[bool] = mapped_column(Boolean, default=False)
 
 
+class CatalogOverride(Base):
+    """Admin edits to the model catalog, made on the Catalog page. Overrides the
+    config/models.yaml defaults per model key (DB wins), so an admin never needs
+    to edit a file on the server. A row exists only for models that differ from
+    the YAML default; deleting it reverts the model to the shipped default.
+    replacement == 'none' means 'explicitly no replacement'."""
+
+    __tablename__ = "catalog_overrides"
+    __table_args__ = (
+        UniqueConstraint("model_key", name="uq_catalog_overrides_model_key"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    model_key: Mapped[str] = mapped_column(String(16), index=True)
+    poe_class: Mapped[int | None] = mapped_column(Integer)
+    lifecycle: Mapped[str | None] = mapped_column(String(32))
+    replacement: Mapped[str | None] = mapped_column(String(32))
+    verified: Mapped[bool | None] = mapped_column(Boolean)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, onupdate=utcnow
+    )
+
+
 class TrunkCapacity(Base):
     """Channel count for a PSTN gateway / SIP trunk, so concurrency can be shown
     as a utilization %. Operator-set (Voxa-owned)."""

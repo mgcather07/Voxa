@@ -83,7 +83,9 @@ class ReplacementChoice:
 
 
 class Catalog:
-    def __init__(self, path: Path = CATALOG_PATH) -> None:
+    def __init__(
+        self, path: Path = CATALOG_PATH, overrides: dict[str, dict] | None = None
+    ) -> None:
         raw = yaml.safe_load(path.read_text())
         self._class_watts: dict[int, float] = {
             int(k): float(v) for k, v in raw["poe_class_watts"].items()
@@ -92,6 +94,45 @@ class Catalog:
         self._replacements: dict[str, dict] = raw.get("replacements", {})
         self._models: dict[str, dict] = raw.get("models", {})
         self._default: dict = raw.get("default", {})
+        # Admin edits from the DB, keyed by model. Each value may set poe_class,
+        # lifecycle, replacement, verified; a set field wins over the YAML.
+        self._overrides: dict[str, dict] = overrides or {}
+
+    def base_entry(self, key: str) -> dict:
+        """The YAML-only entry for a model (defaults + models.yaml, no DB edits).
+        Used to tell whether an admin's submitted values differ from default."""
+        return {**self._default, **(self._models.get(key) or {})}
+
+    def _eff(self, key: str) -> dict:
+        """YAML entry merged with any admin override (override wins per field)."""
+        entry = dict(self._models.get(key) or {})
+        ov = self._overrides.get(key) or {}
+        if ov.get("poe_class") is not None:
+            entry["poe_class"] = ov["poe_class"]
+        if ov.get("lifecycle"):
+            entry["lifecycle"] = ov["lifecycle"]
+        if ov.get("verified") is not None:
+            entry["verified"] = ov["verified"]
+        rep = ov.get("replacement")
+        if rep is not None:
+            entry["replacement"] = None if rep == "none" else rep
+        return entry
+
+    def effective(self, key: str) -> dict:
+        """The merged entry (defaults + YAML + override) an admin is editing."""
+        return {**self._default, **self._eff(key)}
+
+    def has_override(self, key: str) -> bool:
+        return key in self._overrides
+
+    def lifecycle_options(self) -> list[tuple[str, str]]:
+        return list(self._labels.items())
+
+    def replacement_options(self) -> list[tuple[str, str]]:
+        return [(k, v.get("name") or k) for k, v in self._replacements.items()]
+
+    def poe_classes(self) -> list[int]:
+        return sorted(self._class_watts)
 
     def watts_for_class(self, poe_class: int | None) -> float:
         if poe_class is None:
@@ -107,7 +148,7 @@ class Catalog:
 
     def lookup(self, model_string: str | None) -> ModelInfo:
         key = self.extract_key(model_string) or "unknown"
-        entry = {**self._default, **(self._models.get(key) or {})}
+        entry = {**self._default, **self._eff(key)}
 
         poe_class = entry.get("poe_class")
         replacement_key = entry.get("replacement")
@@ -151,7 +192,7 @@ class Catalog:
         if family == "8800":
             alt_key = _ALT_8800.get(base_key)
             if alt_key:
-                raw_class = (self._models.get(alt_key) or {}).get("poe_class")
+                raw_class = self._eff(alt_key).get("poe_class")
                 poe_class = (
                     int(raw_class)
                     if raw_class is not None
@@ -181,6 +222,48 @@ class Catalog:
         )
 
 
+def _load_overrides() -> dict[str, dict]:
+    """Admin catalog edits from the DB, keyed by model. Returns empty if the
+    table isn't ready yet (e.g. the very first boot before init_db runs)."""
+    try:
+        from .db import session_scope
+        from .models import CatalogOverride
+
+        with session_scope() as session:
+            return {
+                row.model_key: {
+                    "poe_class": row.poe_class,
+                    "lifecycle": row.lifecycle,
+                    "replacement": row.replacement,
+                    "verified": row.verified,
+                }
+                for row in session.query(CatalogOverride).all()
+            }
+    except Exception:  # noqa: BLE001 - never let catalog loading crash a page
+        return {}
+
+
 @lru_cache
 def get_catalog() -> Catalog:
-    return Catalog()
+    return Catalog(overrides=_load_overrides())
+
+
+def reapply_to_phones(session) -> int:
+    """Re-derive every phone's catalog fields from the current catalog, without
+    contacting CUCM. Called after an admin edits the catalog so the change shows
+    across the dashboard/plan/PoE immediately. Returns phones updated."""
+    from .models import Phone
+
+    catalog = get_catalog()
+    phones = session.query(Phone).all()
+    for phone in phones:
+        info = catalog.lookup(phone.model_raw)
+        phone.family = info.family
+        phone.generation = info.generation
+        phone.lifecycle = info.lifecycle
+        phone.poe_class = info.poe_class
+        phone.poe_watts = info.poe_watts
+        phone.replacement_key = info.replacement_key
+        phone.replacement_name = info.replacement_name
+        phone.replacement_poe_watts = info.replacement_poe_watts
+    return len(phones)

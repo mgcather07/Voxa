@@ -43,7 +43,7 @@ from . import (
     webhooks,
 )
 from .cucm_probe import probe as probe_cluster
-from .catalog import DEFAULT_FAMILY, FAMILIES, get_catalog
+from .catalog import DEFAULT_FAMILY, FAMILIES, get_catalog, reapply_to_phones
 from .auth import (
     RedirectToLogin,
     get_backend,
@@ -59,6 +59,7 @@ from .models import (
     SWAP_STATUSES,
     ApiToken,
     CallStat,
+    CatalogOverride,
     Cluster,
     ClusterTestLog,
     Location,
@@ -842,6 +843,94 @@ def _recent_logs(session: Session, cluster_id: int, limit: int = 6):
         .order_by(ClusterTestLog.id.desc())
         .limit(limit)
     ).all()
+
+
+def _catalog_ctx(request, session, user, **extra):
+    catalog = get_catalog()
+    rows = []
+    for m in reports.by_model(session):
+        key = m["model_key"]
+        if not key or key == "unknown":
+            continue
+        eff = catalog.effective(key)
+        rows.append(
+            {
+                "key": key,
+                "model_raw": m["model_raw"] or f"Cisco {key}",
+                "count": m["count"],
+                "poe_class": eff.get("poe_class"),
+                "lifecycle": eff.get("lifecycle") or "unknown",
+                "replacement": eff.get("replacement") or "none",
+                "verified": bool(eff.get("verified")),
+                "overridden": catalog.has_override(key),
+            }
+        )
+    return _ctx(
+        request, session, user,
+        rows=rows,
+        lifecycle_options=catalog.lifecycle_options(),
+        replacement_options=catalog.replacement_options(),
+        poe_classes=[(c, catalog.watts_for_class(c)) for c in catalog.poe_classes()],
+        **extra,
+    )
+
+
+@app.get("/catalog", response_class=HTMLResponse)
+def catalog_page(
+    request: Request,
+    saved: int = 0,
+    session: Session = Depends(get_session),
+    user: User = Depends(require_admin),
+):
+    return templates.TemplateResponse(
+        "catalog.html", _catalog_ctx(request, session, user, saved=bool(saved))
+    )
+
+
+@app.post("/catalog")
+async def catalog_save(
+    request: Request,
+    session: Session = Depends(get_session),
+    user: User = Depends(require_admin),
+):
+    catalog = get_catalog()
+    form = await request.form()
+    for key in form.getlist("model_key"):
+        base = catalog.base_entry(key)
+        base_poe = int(base.get("poe_class") or 3)
+        poe_v = int(form.get(f"poe_class__{key}") or base_poe)
+        life_v = form.get(f"lifecycle__{key}") or "unknown"
+        rep_raw = form.get(f"replacement__{key}") or "none"  # "none" or a key
+        rep_norm = None if rep_raw == "none" else rep_raw
+        ver_v = form.get(f"verified__{key}") is not None
+
+        # A row that matches the shipped default is stored as no override at all,
+        # so "set the fields back to default and Save" cleanly reverts.
+        same = (
+            poe_v == base_poe
+            and life_v == (base.get("lifecycle") or "unknown")
+            and rep_norm == base.get("replacement")
+            and ver_v == bool(base.get("verified", False))
+        )
+        row = session.query(CatalogOverride).filter_by(model_key=key).one_or_none()
+        if same:
+            if row is not None:
+                session.delete(row)
+        else:
+            if row is None:
+                row = CatalogOverride(model_key=key)
+                session.add(row)
+            row.poe_class = poe_v
+            row.lifecycle = life_v
+            row.replacement = rep_raw
+            row.verified = ver_v
+
+    session.commit()            # persist overrides so the reload below sees them
+    get_catalog.cache_clear()   # next get_catalog() rebuilds with the new edits
+    n = reapply_to_phones(session)
+    session.commit()            # persist the re-derived phone fields
+    log.info("Catalog edited by %s; re-derived %s phones", user.username, n)
+    return RedirectResponse(url="/catalog?saved=1", status_code=303)
 
 
 def _settings_ctx(request, session, user, **extra):
