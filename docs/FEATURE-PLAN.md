@@ -119,3 +119,7 @@ Voxa. This wave stores raw CDR/CMR records (not just the Phase-5 aggregates).
 - ✅ Gateway/trunk call volume + minutes from CDR (external calls route through
      named gateways); searchable on `/calls`
 - ✅ Quality-issues panel: worst-MOS legs, each linking straight to its trace
+
+## Phase 11 — CDR reports  ✅
+Plugged into the Phase-4 reports engine (CSV / XLSX / print for free).
+- ✅ Missed calls · Poor-quality calls · Top talkers · Gateways & trunks

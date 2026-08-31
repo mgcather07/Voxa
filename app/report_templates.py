@@ -6,11 +6,14 @@ same data drives the on-screen table, the CSV, and the XLSX without rework.
 
 from __future__ import annotations
 
+from collections import Counter
+
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from . import reports
-from .models import CallStat, Phone
+from .calls import cause_label
+from .models import CallQuality, CallRecord, CallStat, Phone
 
 # Order shown on the /reports index.
 REPORT_META = [
@@ -24,6 +27,14 @@ REPORT_META = [
      "Counts and lifecycle split per site, for phasing the rollout."),
     ("by-model", "Fleet by model",
      "What you have and what each maps to, quantities for a quote."),
+    ("missed-calls", "Missed calls",
+     "Unanswered calls with the disconnect cause — from CDR."),
+    ("poor-quality", "Poor-quality calls",
+     "Call legs with a MOS below 3.6 — the ones users complain about."),
+    ("top-talkers", "Top talkers",
+     "Busiest extensions by call volume."),
+    ("gateway-summary", "Gateways & trunks",
+     "External call volume and minutes per PSTN gateway / SIP trunk."),
 ]
 
 
@@ -105,12 +116,76 @@ def _unused_phones(session: Session):
     return "Unused phones", "No calls recorded — retire rather than replace", columns, data
 
 
+def _missed_calls(session: Session):
+    rows = session.scalars(
+        select(CallRecord).where(CallRecord.duration == 0)
+        .order_by(CallRecord.orig_time.desc())
+    ).all()
+    columns = ["When", "Calling", "Called", "Orig device", "Cause"]
+    data = [
+        [
+            r.orig_time.strftime("%Y-%m-%d %H:%M:%S") if r.orig_time else "",
+            r.calling_number or "", r.final_called or r.original_called or "",
+            r.orig_device or "",
+            cause_label(r.dest_cause if r.dest_cause is not None else r.orig_cause),
+        ]
+        for r in rows
+    ]
+    return "Missed calls", "Unanswered calls, from CDR", columns, data
+
+
+def _poor_quality(session: Session):
+    bad = session.scalars(
+        select(CallQuality).where(CallQuality.mos.is_not(None), CallQuality.mos < 3.6)
+        .order_by(CallQuality.mos.asc())
+    ).all()
+    columns = ["Device", "MOS", "Jitter ms", "Latency ms", "Loss %", "Ext"]
+    data = [
+        [cq.device or "", cq.mos, cq.jitter_ms, cq.latency_ms, cq.loss_pct,
+         cq.directory_number or ""]
+        for cq in bad
+    ]
+    return "Poor-quality calls", "Legs with MOS < 3.6", columns, data
+
+
+def _top_talkers(session: Session):
+    counter: Counter = Counter()
+    for (num,) in session.execute(
+        select(CallRecord.calling_number).where(CallRecord.calling_number.is_not(None))
+    ).all():
+        counter[num] += 1
+    columns = ["Extension", "Calls"]
+    data = [[num, n] for num, n in counter.most_common(100)]
+    return "Top talkers", "Busiest extensions by call volume", columns, data
+
+
+def _gateway_summary(session: Session):
+    calls_ct: Counter = Counter()
+    secs: Counter = Counter()
+    for orig, dest, dur in session.execute(
+        select(CallRecord.orig_device, CallRecord.dest_device, CallRecord.duration)
+    ).all():
+        for dev in (orig, dest):
+            if dev and not dev.startswith("SEP"):
+                calls_ct[dev] += 1
+                secs[dev] += dur or 0
+    columns = ["Gateway / trunk", "Calls", "Minutes"]
+    data = [
+        [gw, n, round(secs[gw] / 60)] for gw, n in calls_ct.most_common()
+    ]
+    return "Gateways & trunks", "External call volume per gateway", columns, data
+
+
 _BUILDERS = {
     "eol-priority": _eol_priority,
     "unused-phones": _unused_phones,
     "coverage-gaps": _coverage_gaps,
     "by-site": _by_site,
     "by-model": _by_model,
+    "missed-calls": _missed_calls,
+    "poor-quality": _poor_quality,
+    "top-talkers": _top_talkers,
+    "gateway-summary": _gateway_summary,
 }
 
 
