@@ -39,8 +39,10 @@ from . import (
     locations,
     report_templates,
     reports,
+    settings_store,
     webhooks,
 )
+from .cucm_probe import probe as probe_cluster
 from .catalog import DEFAULT_FAMILY, FAMILIES, get_catalog
 from .auth import (
     RedirectToLogin,
@@ -57,9 +59,11 @@ from .models import (
     SWAP_STATUSES,
     ApiToken,
     CallStat,
+    Cluster,
     Location,
     LocationRule,
     Phone,
+    Setting,
     SyncRun,
     TrunkCapacity,
     User,
@@ -143,10 +147,13 @@ def _fleet_total(session: Session) -> int:
 
 
 def _ctx(request: Request, session: Session, user: User | None = None, **extra) -> dict:
+    cfg = settings_store.load(session)
     return {
         "request": request,
         "latest_run": _latest_run(session),
         "settings": settings,
+        "app_name": cfg.app_name,
+        "cluster_host": settings_store.primary_host(session),
         "swap_statuses": SWAP_STATUSES,
         "fleet_total": _fleet_total(session),
         "user": user,
@@ -676,7 +683,7 @@ def _integrations_ctx(request, session, user, **extra):
         tokens=session.scalars(select(ApiToken).order_by(ApiToken.id.desc())).all(),
         hooks=session.scalars(select(Webhook).order_by(Webhook.id.desc())).all(),
         webhook_events=webhooks.EVENTS,
-        webhooks_master=settings.webhooks_enabled,
+        webhooks_master=settings_store.load(session).webhooks_enabled,
         **extra,
     )
 
@@ -781,6 +788,155 @@ def webhook_test(
     result = webhooks.send_test(session, hook) if hook else "not found"
     return templates.TemplateResponse(
         "integrations.html", _integrations_ctx(request, session, user, test_result=result)
+    )
+
+
+# ---------------------------------------------------------------------------
+# Settings (operational config) — admin only
+# ---------------------------------------------------------------------------
+def _truthy(value: str) -> bool:
+    return str(value).strip().lower() in {"on", "true", "1", "yes"}
+
+
+def _settings_ctx(request, session, user, **extra):
+    groups: dict[str, list] = {}
+    for key, kind, secret, group, label in settings_store.SCHEMA:
+        groups.setdefault(group, []).append(
+            {"key": key, "kind": kind, "secret": secret, "label": label}
+        )
+    return _ctx(
+        request, session, user,
+        setting_groups=groups,
+        values=settings_store.form_values(session),
+        clusters=session.scalars(select(Cluster).order_by(Cluster.id)).all(),
+        secret_mask=settings_store.SECRET_MASK,
+        **extra,
+    )
+
+
+@app.get("/settings", response_class=HTMLResponse)
+def settings_page(
+    request: Request,
+    session: Session = Depends(get_session),
+    user: User = Depends(require_admin),
+):
+    return templates.TemplateResponse("settings.html", _settings_ctx(request, session, user))
+
+
+@app.post("/settings")
+async def settings_save(
+    request: Request,
+    session: Session = Depends(get_session),
+    user: User = Depends(require_admin),
+):
+    form = await request.form()
+    settings_store.save(session, dict(form))
+    log.info("Settings updated by %s", user.username)
+    return RedirectResponse(url="/settings", status_code=303)
+
+
+@app.post("/settings/clusters")
+def cluster_add(
+    name: str = Form(...),
+    axl_host: str = Form(...),
+    cucm_user: str = Form(""),
+    cucm_password: str = Form(""),
+    axl_version: str = Form("12.5"),
+    verify_tls: str = Form(""),
+    phone_web_enabled: str = Form(""),
+    session: Session = Depends(get_session),
+    user: User = Depends(require_admin),
+):
+    if name.strip() and axl_host.strip():
+        session.add(Cluster(
+            name=name.strip(), axl_host=axl_host.strip(),
+            cucm_user=cucm_user.strip(), cucm_password=cucm_password,
+            axl_version=axl_version.strip() or "12.5",
+            verify_tls=_truthy(verify_tls),
+            phone_web_enabled=_truthy(phone_web_enabled),
+        ))
+        session.commit()
+    return RedirectResponse(url="/settings", status_code=303)
+
+
+@app.post("/settings/clusters/{cluster_id}")
+def cluster_edit(
+    cluster_id: int,
+    name: str = Form(...),
+    axl_host: str = Form(...),
+    cucm_user: str = Form(""),
+    cucm_password: str = Form(""),
+    axl_version: str = Form("12.5"),
+    verify_tls: str = Form(""),
+    phone_web_enabled: str = Form(""),
+    session: Session = Depends(get_session),
+    user: User = Depends(require_admin),
+):
+    c = session.get(Cluster, cluster_id)
+    if c:
+        c.name = name.strip() or c.name
+        c.axl_host = axl_host.strip() or c.axl_host
+        c.cucm_user = cucm_user.strip()
+        # Masked/blank password means "keep the stored one".
+        if cucm_password and cucm_password != settings_store.SECRET_MASK:
+            c.cucm_password = cucm_password
+        c.axl_version = axl_version.strip() or "12.5"
+        c.verify_tls = _truthy(verify_tls)
+        c.phone_web_enabled = _truthy(phone_web_enabled)
+        session.commit()
+    return RedirectResponse(url="/settings", status_code=303)
+
+
+@app.post("/settings/clusters/{cluster_id}/toggle")
+def cluster_toggle(
+    cluster_id: int,
+    session: Session = Depends(get_session),
+    user: User = Depends(require_admin),
+):
+    c = session.get(Cluster, cluster_id)
+    if c:
+        c.enabled = not c.enabled
+        session.commit()
+    return RedirectResponse(url="/settings", status_code=303)
+
+
+@app.post("/settings/clusters/{cluster_id}/delete")
+def cluster_delete(
+    cluster_id: int,
+    session: Session = Depends(get_session),
+    user: User = Depends(require_admin),
+):
+    c = session.get(Cluster, cluster_id)
+    if c:
+        session.delete(c)
+        session.commit()
+    return RedirectResponse(url="/settings", status_code=303)
+
+
+@app.post("/settings/clusters/{cluster_id}/test", response_class=HTMLResponse)
+def cluster_test(
+    request: Request,
+    cluster_id: int,
+    session: Session = Depends(get_session),
+    user: User = Depends(require_admin),
+):
+    c = session.get(Cluster, cluster_id)
+    results = []
+    if c:
+        conn = settings_store.ClusterConn(
+            name=c.name, host=c.axl_host, user=c.cucm_user,
+            password=c.cucm_password, axl_version=c.axl_version,
+            verify_tls=c.verify_tls, phone_web_enabled=c.phone_web_enabled,
+        )
+        results = probe_cluster(conn)
+        c.last_test_at = utcnow()
+        c.last_test_result = "; ".join(
+            f"{r['check']}: {'ok' if r['ok'] else 'FAIL'}" for r in results
+        )
+        session.commit()
+    return templates.TemplateResponse(
+        "settings.html",
+        _settings_ctx(request, session, user, test_results=results, tested_id=cluster_id),
     )
 
 

@@ -118,8 +118,15 @@ docker run --rm python:3.12-slim python -c \
   "import secrets; print(secrets.token_urlsafe(48))"     # SECRET_KEY
 ```
 
-Fill in `.env.prod`: `SECRET_KEY`, `POSTGRES_PASSWORD`, `CUCM_HOST`,
-`CUCM_USER`, `CUCM_PASSWORD`.
+`.env.prod` only needs the **bootstrap** values now: `SECRET_KEY`,
+`POSTGRES_PASSWORD`, `VOXA_IMAGE`, and (optionally) the `CUCM_*` values as a
+first-run default. Everything **operational** — CUCM cluster connections, SNMP,
+LDAP, the CDR directory, phone-scrape tuning, the app name — is set in-app on the
+**Settings** page (admin) and stored in the database; a value there overrides the
+env default. So after first boot you connect Call Manager in the UI ("Add a
+cluster" → Test connection), not by editing `.env`. Connection secrets are stored
+in the database and masked in the UI (same plaintext-at-rest posture as `.env`,
+restricted by database access).
 
 `.env.prod` is gitignored. Keep the real values in whatever your team uses for
 secrets; the file on the VM is a copy, not the master.

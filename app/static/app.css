@@ -908,6 +908,56 @@ td.device a:hover { color: var(--blue-bright); }
 }
 
 /* ===========================================================================
+   Settings
+   ========================================================================== */
+.cluster-edit { width: 100%; }
+.cluster-row, .cluster-add {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.cluster-add {
+  padding-top: 12px;
+  border-top: 1px solid var(--hairline-soft);
+  margin-top: 4px;
+}
+.cluster-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0 10px;
+  border-bottom: 1px solid var(--row-line);
+}
+.cluster-row input[type="text"], .cluster-row input[type="password"],
+.cluster-add input[type="text"], .cluster-add input[type="password"],
+.setting-input {
+  background: var(--surface-1);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-md);
+  padding: 8px 10px;
+  color: var(--ink-1);
+  font-size: 13px;
+  outline: none;
+}
+.setting-input { width: 280px; max-width: 100%; }
+.cluster-row input:focus, .cluster-add input:focus, .setting-input:focus {
+  border-color: color-mix(in srgb, var(--blue) 60%, transparent);
+}
+.chk {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+.settings-group { display: flex; flex-direction: column; gap: 10px; padding: 6px 0 12px; border-bottom: 1px solid var(--row-line); }
+.field-row { display: flex; align-items: center; gap: 14px; }
+.field-label { font-size: 13px; color: var(--ink-2); min-width: 240px; }
+.hint-set { font-size: 11.5px; color: var(--green); }
+
+/* ===========================================================================
    E911 locations
    ========================================================================== */
 .loc-form, .rule-form {

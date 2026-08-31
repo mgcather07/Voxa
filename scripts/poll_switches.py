@@ -14,20 +14,20 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from app import snmp  # noqa: E402
-from app.config import get_settings  # noqa: E402
+from app import settings_store, snmp  # noqa: E402
 from app.db import init_db, session_scope  # noqa: E402
 
 
 def main() -> int:
-    settings = get_settings()
-    if not settings.snmp_enabled:
-        print("SNMP polling is disabled (set SNMP_ENABLED=true).", file=sys.stderr)
-        return 1
     init_db()
+    with session_scope() as probe:
+        enabled = settings_store.load(probe).snmp_enabled
+    if not enabled:
+        print("SNMP polling is disabled (enable it in Settings).", file=sys.stderr)
+        return 1
     try:
         with session_scope() as session:
-            result = snmp.poll_all(session, settings)
+            result = snmp.poll_all(session)
     except NotImplementedError as exc:
         print(exc, file=sys.stderr)
         return 1

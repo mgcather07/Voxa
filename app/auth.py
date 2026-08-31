@@ -152,11 +152,13 @@ class LdapAuthBackend:
                 "LDAP auth needs ldap3: pip install -r requirements-ldap.txt"
             ) from exc
 
-        s = self.settings
+        from . import settings_store
+
+        s = settings_store.load(session)
         if not (s.ldap_url and s.ldap_bind_dn and s.ldap_user_base_dn):
             raise NotImplementedError(
                 "LDAP is not configured (set LDAP_URL, LDAP_BIND_DN, "
-                "LDAP_USER_BASE_DN)."
+                "LDAP_USER_BASE_DN in Settings)."
             )
         # Never allow an empty password: many directories treat an empty bind
         # password as an anonymous bind, which would succeed and be a bypass.
@@ -227,8 +229,10 @@ class LdapAuthBackend:
 
 
 def get_backend(settings: Settings | None = None) -> AuthBackend:
+    from . import settings_store
+
     settings = settings or get_settings()
-    if settings.auth_backend == "ldap":
+    if settings_store.load().auth_backend == "ldap":
         return LdapAuthBackend(settings)
     return LocalAuthBackend()
 

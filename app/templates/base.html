@@ -3,7 +3,9 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{% block title %}{{ settings.app_name }}{% endblock %}</title>
+  {% set app_name = app_name or settings.app_name %}
+  {% set cluster_host = cluster_host or settings.cucm_host %}
+  <title>{% block title %}{{ app_name }}{% endblock %}</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/htmx/1.9.12/htmx.min.js"></script>
   <script>htmx.config.useTemplateFragments = true;</script>
   <link rel="stylesheet" href="/static/app.css">
@@ -18,7 +20,7 @@
         <div class="bars"><i></i><i></i><i></i><i></i></div>
       </div>
       <div>
-        <div class="brand-name">{{ settings.app_name }}</div>
+        <div class="brand-name">{{ app_name }}</div>
         <div class="brand-sub">Call telemetry</div>
       </div>
     </div>
@@ -65,6 +67,9 @@
       <a class="nav-item {{ 'on' if path == '/integrations' }}" href="/integrations">
         <span class="bar"></span>Integrations
       </a>
+      <a class="nav-item {{ 'on' if path == '/settings' }}" href="/settings">
+        <span class="bar"></span>Settings
+      </a>
       {% endif %}
     </nav>
 
@@ -74,7 +79,7 @@
           <svg width="13" height="13" viewBox="0 0 24 24" fill="var(--green)" aria-hidden="true"><path d="M12 1.5 4 5v6.4c0 5 3.4 9.6 8 11.1 4.6-1.5 8-6.1 8-11.1V5l-8-3.5Zm-1 14.6-3.2-3.2 1.4-1.4L11 13.3l4.8-4.8 1.4 1.4-6.2 6.2Z"/></svg>
           <span>Read only</span>
         </div>
-        <div class="readonly-body">{{ settings.app_name }} never writes to CUCM. Every call is a read.</div>
+        <div class="readonly-body">{{ app_name }} never writes to CUCM. Every call is a read.</div>
       </div>
       {% if user %}
       <div class="userrow">
@@ -96,7 +101,7 @@
       </div>
       <div class="topbar-actions">
         <div class="cluster-pill">
-          <span class="host">{{ settings.cucm_host }}</span>
+          <span class="host">{{ cluster_host }}</span>
           <span class="div">|</span>
           <span class="svc">AXL · RIS · WEB</span>
         </div>
@@ -113,7 +118,7 @@
     </div>
 
     <footer class="footer">
-      <span>Read-only against {{ settings.cucm_host }}</span>
+      <span>Read-only against {{ cluster_host }}</span>
       <span>PoE figures use IEEE class ceilings &mdash; verify each model before ordering.</span>
     </footer>
   </main>

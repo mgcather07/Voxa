@@ -20,7 +20,7 @@ import httpx
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from .config import get_settings
+from . import settings_store
 from .db import session_scope
 from .models import Webhook, utcnow
 
@@ -55,9 +55,9 @@ def _deliver(hook: Webhook, event: str, payload: dict) -> str:
 def fire(event: str, payload: dict) -> None:
     """Deliver an event to every enabled webhook subscribed to it. No-op unless
     the global switch is on."""
-    if not get_settings().webhooks_enabled:
-        return
     with session_scope() as session:
+        if not settings_store.load(session).webhooks_enabled:
+            return
         for hook in session.scalars(
             select(Webhook).where(Webhook.enabled.is_(True))
         ).all():
@@ -70,8 +70,8 @@ def fire(event: str, payload: dict) -> None:
 def send_test(session: Session, hook: Webhook) -> str:
     """Admin-initiated test. Still gated by the global switch so a disabled
     instance sends nothing."""
-    if not get_settings().webhooks_enabled:
-        return "webhooks disabled (set WEBHOOKS_ENABLED=true)"
+    if not settings_store.load(session).webhooks_enabled:
+        return "webhooks disabled (enable it in Settings)"
     status = _deliver(hook, "test", {"message": "Voxa webhook test"})
     session.commit()
     return status

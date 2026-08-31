@@ -10,7 +10,7 @@ from sqlalchemy import select
 
 from .catalog import get_catalog
 from .config import Settings, get_settings
-from . import webhooks
+from . import settings_store, webhooks
 from .cucm import AxlClient, RisPortClient, fetch_many
 from .db import session_scope
 from .history import latest_diff, record_snapshots
@@ -54,41 +54,44 @@ def run_sync(settings: Settings | None = None) -> int:
         run_id = run.id
 
     try:
-        # --- 1. Configuration from AXL ------------------------------------
-        _set_stage(run_id, "querying AXL")
-        axl = AxlClient(
-            settings.cucm_host,
-            settings.cucm_user,
-            settings.cucm_password,
-            version=settings.cucm_axl_version,
-            verify=settings.cucm_verify_tls,
-        )
-        axl_phones = {p.name: p for p in axl.iter_phones() if p.name}
-        _set_stage(run_id, "querying RisPort", axl_count=len(axl_phones))
+        conns = settings_store.clusters()
+        cfg = settings_store.load()
 
-        # --- 2. Live state from RisPort -----------------------------------
-        ris = RisPortClient(
-            settings.cucm_host,
-            settings.cucm_user,
-            settings.cucm_password,
-            verify=settings.cucm_verify_tls,
-        )
-        ris_devices = ris.fetch_all()
-        _set_stage(run_id, "scraping phones", ris_count=len(ris_devices))
-
-        # --- 3. Serial + switch port from the phones themselves -----------
+        # --- 1-3. Collect from every enabled cluster ----------------------
+        axl_phones: dict[str, tuple] = {}   # name -> (AxlPhone, cluster_name)
+        ris_devices: dict[str, tuple] = {}  # name -> (RisDevice, cluster_name)
         web_info: dict = {}
-        if settings.phone_web_enabled:
-            ips = [
-                d.ip_address
-                for d in ris_devices.values()
-                if d.ip_address and (d.status or "").lower() == "registered"
-            ]
-            web_info = fetch_many(
-                ips,
-                concurrency=settings.phone_web_concurrency,
-                timeout=settings.phone_web_timeout,
+        for conn in conns:
+            _set_stage(run_id, f"querying AXL ({conn.name})")
+            axl = AxlClient(
+                conn.host, conn.user, conn.password,
+                version=conn.axl_version, verify=conn.verify_tls,
             )
+            for p in axl.iter_phones():
+                if p.name:
+                    axl_phones[p.name] = (p, conn.name)
+            _set_stage(run_id, f"querying RisPort ({conn.name})",
+                       axl_count=len(axl_phones))
+
+            ris = RisPortClient(conn.host, conn.user, conn.password,
+                                verify=conn.verify_tls)
+            devices = ris.fetch_all()
+            for dname, dev in devices.items():
+                ris_devices[dname] = (dev, conn.name)
+            _set_stage(run_id, f"scraping phones ({conn.name})",
+                       ris_count=len(ris_devices))
+
+            if cfg.phone_web_enabled and conn.phone_web_enabled:
+                ips = [
+                    d.ip_address
+                    for d in devices.values()
+                    if d.ip_address and (d.status or "").lower() == "registered"
+                ]
+                web_info.update(fetch_many(
+                    ips,
+                    concurrency=cfg.phone_web_concurrency,
+                    timeout=cfg.phone_web_timeout,
+                ))
         reachable = sum(1 for i in web_info.values() if i.reachable)
         _set_stage(run_id, "writing database", web_count=reachable)
 
@@ -103,8 +106,14 @@ def run_sync(settings: Settings | None = None) -> int:
 
             all_names = set(axl_phones) | set(ris_devices)
             for name in all_names:
-                axl_row = axl_phones.get(name)
-                ris_row = ris_devices.get(name)
+                axl_entry = axl_phones.get(name)
+                ris_entry = ris_devices.get(name)
+                axl_row = axl_entry[0] if axl_entry else None
+                ris_row = ris_entry[0] if ris_entry else None
+                cluster_name = (
+                    axl_entry[1] if axl_entry
+                    else ris_entry[1] if ris_entry else None
+                )
                 model_raw = (
                     (axl_row.model if axl_row else None)
                     or (ris_row.product if ris_row else None)
@@ -126,7 +135,7 @@ def run_sync(settings: Settings | None = None) -> int:
                     phone.protocol = axl_row.protocol
                     phone.device_pool = axl_row.device_pool
                     phone.site = derive_site(
-                        axl_row.device_pool, settings.site_from_device_pool
+                        axl_row.device_pool, cfg.site_from_device_pool
                     )
                     phone.configured_load = axl_row.load_information
                     phone.directory_number = axl_row.directory_number
@@ -159,7 +168,8 @@ def run_sync(settings: Settings | None = None) -> int:
                 elif web is not None:
                     phone.web_reachable = False
 
-                phone.cluster = settings.cluster_name
+                if cluster_name:
+                    phone.cluster = cluster_name
                 phone.model_key = info.key
                 phone.family = info.family
                 phone.generation = info.generation

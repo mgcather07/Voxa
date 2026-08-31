@@ -22,7 +22,8 @@ from datetime import datetime, timezone
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from .config import Settings, get_settings
+from . import settings_store
+from .config import Settings
 from .models import Phone, SwitchPoll
 
 log = logging.getLogger(__name__)
@@ -92,9 +93,9 @@ def _switch_targets(session: Session) -> dict[str, str]:
     return targets
 
 
-def poll_all(session: Session, settings: Settings | None = None) -> dict:
+def poll_all(session: Session, settings=None) -> dict:
     """Poll every discovered switch and upsert SwitchPoll rows."""
-    settings = settings or get_settings()
+    settings = settings or settings_store.load(session)
     targets = _switch_targets(session)
     existing = {p.switch_name: p for p in session.scalars(select(SwitchPoll)).all()}
     now = datetime.now(timezone.utc)

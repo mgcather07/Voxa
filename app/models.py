@@ -211,6 +211,41 @@ class CallStat(Base):
         return round(self.total_seconds / 60)
 
 
+class Cluster(Base):
+    """A CUCM cluster connection, configured in the UI instead of .env. The
+    collector iterates enabled clusters; every phone is tagged with the name.
+    The password is stored here (masked in the UI) — same posture as .env."""
+
+    __tablename__ = "clusters"
+    __table_args__ = (UniqueConstraint("name", name="uq_clusters_name"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(64))
+    axl_host: Mapped[str] = mapped_column(String(255))
+    cucm_user: Mapped[str] = mapped_column(String(128), default="")
+    cucm_password: Mapped[str] = mapped_column(String(255), default="")
+    axl_version: Mapped[str] = mapped_column(String(16), default="12.5")
+    verify_tls: Mapped[bool] = mapped_column(Boolean, default=False)
+    phone_web_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    last_test_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_test_result: Mapped[str | None] = mapped_column(Text)
+
+
+class Setting(Base):
+    """Operational config as key/value, edited in the Settings UI (DB overrides
+    the env default). Bootstrap settings — DATABASE_URL, SECRET_KEY — stay in env
+    and are NOT stored here."""
+
+    __tablename__ = "settings"
+    __table_args__ = (UniqueConstraint("key", name="uq_settings_key"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    key: Mapped[str] = mapped_column(String(64), index=True)
+    value: Mapped[str] = mapped_column(Text, default="")
+    is_secret: Mapped[bool] = mapped_column(Boolean, default=False)
+
+
 class TrunkCapacity(Base):
     """Channel count for a PSTN gateway / SIP trunk, so concurrency can be shown
     as a utilization %. Operator-set (Voxa-owned)."""

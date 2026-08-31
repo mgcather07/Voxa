@@ -16,15 +16,14 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from sqlalchemy import func, select  # noqa: E402
 
-from app import cdr, webhooks  # noqa: E402
-from app.config import get_settings  # noqa: E402
+from app import cdr, settings_store, webhooks  # noqa: E402
 from app.db import init_db, session_scope  # noqa: E402
 from app.models import CallQuality  # noqa: E402
 
 
 def main() -> int:
     init_db()
-    directory = sys.argv[1] if len(sys.argv) > 1 else get_settings().cdr_dir
+    directory = sys.argv[1] if len(sys.argv) > 1 else settings_store.load().cdr_dir
     with session_scope() as session:
         result = cdr.ingest_directory(session, directory)
         poor = session.scalar(

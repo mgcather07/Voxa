@@ -134,6 +134,20 @@ Plugged into the Phase-4 reports engine (CSV / XLSX / print for free).
 - ✅ `TrunkCapacity` (editable channels per trunk) → utilization %
 - ✅ `/capacity` page (concurrency chart + per-trunk table)
 
+## Phase 14 — Settings / config UI (no hard-coding)  ✅
+Site-specific config moves out of `.env` into a DB-backed, admin-editable
+Settings page. Two tiers: **bootstrap** (env only — DATABASE_URL, SECRET_KEY,
+AUTH_DISABLED) and **operational** (DB overrides env).
+- ✅ `Cluster` model — connect CUCM in the UI (multiple, per-cluster host / service
+     account / AXL version / TLS / scrape), enable/disable, **Test connection**
+     (fast-fail probe reusing the AXL/RisPort/phone-web checks)
+- ✅ `Setting` key/value store + `app/settings_store.py` (DB-over-env, typed)
+- ✅ `/settings` admin page: clusters + grouped general settings (Discovery, SNMP,
+     LDAP, CDR, Webhooks, App); **secrets stored in the DB, masked in the UI**
+- ✅ Collector iterates configured clusters (`sync`), tagging each phone; SNMP,
+     LDAP, CDR dir, webhooks master, app name and cluster host all read the store
+- ✅ `make check` / `test_cucm.py` probe every configured cluster
+
 ## Phase 13 — Read API + opt-in webhooks  ✅
 - ✅ `GET /api/v1/...` JSON (phones, phone, calls, call, summary, analytics,
      reports) behind a bearer token (`app/api.py`)

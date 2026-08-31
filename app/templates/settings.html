@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% block title %}Settings &middot; {{ app_name }}{% endblock %}
+{% block page_title %}Settings{% endblock %}
+{% block content %}
+
+<div class="section">
+
+  <div class="card">
+    <div class="card-head">
+      <h2>CUCM clusters</h2>
+      <span class="subhead">connect Call Manager here — stored in the database, not hard-coded in .env</span>
+    </div>
+
+    {% if test_results %}
+    <div class="readonly" style="border-color:var(--hairline)">
+      <div class="readonly-head"><span>Connection test</span></div>
+      {% for r in test_results %}
+      <div class="readonly-body" style="display:flex;gap:8px;align-items:center">
+        <span class="pill {{ 'current' if r.ok else 'eol' }}">{{ 'ok' if r.ok else 'fail' }}</span>
+        <span style="font-weight:600">{{ r.check }}</span>
+        <span class="mono" style="font-size:11.5px;color:var(--ink-2)">{{ r.detail }}</span>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="rule-list">
+      {% if not clusters %}<div class="muted" style="font-size:12.5px">No clusters configured — the app falls back to the CUCM_* values in .env until you add one.</div>{% endif %}
+      {% for c in clusters %}
+      <form class="cluster-edit" method="post" action="/settings/clusters/{{ c.id }}">
+        <div class="cluster-row">
+          <span class="pill {{ 'current' if c.enabled else 'unknown' }}">{{ 'on' if c.enabled else 'off' }}</span>
+          <input type="text" name="name" value="{{ c.name }}" placeholder="name" style="width:120px">
+          <input type="text" name="axl_host" value="{{ c.axl_host }}" placeholder="publisher host" style="flex:1 1 200px">
+          <input type="text" name="cucm_user" value="{{ c.cucm_user }}" placeholder="service account" style="width:150px">
+          <input type="password" name="cucm_password" placeholder="{{ 'unchanged' if c.cucm_password else 'password' }}" autocomplete="new-password" style="width:130px">
+          <input type="text" name="axl_version" value="{{ c.axl_version }}" placeholder="12.5" style="width:64px">
+          <label class="chk"><input type="checkbox" name="verify_tls" {{ 'checked' if c.verify_tls }}> TLS</label>
+          <label class="chk"><input type="checkbox" name="phone_web_enabled" {{ 'checked' if c.phone_web_enabled }}> Scrape</label>
+          <button class="btn btn-secondary" type="submit" style="min-height:32px;padding:0 12px">Save</button>
+        </div>
+      </form>
+      <div class="cluster-actions">
+        {% if c.last_test_result %}<span class="mono" style="font-size:11px;color:var(--ink-3)">last test: {{ c.last_test_result }}</span>{% endif %}
+        <span style="margin-left:auto;display:flex;gap:6px">
+          <form method="post" action="/settings/clusters/{{ c.id }}/test"><button class="linkbtn" type="submit">test connection</button></form>
+          <form method="post" action="/settings/clusters/{{ c.id }}/toggle"><button class="linkbtn" type="submit">{{ 'disable' if c.enabled else 'enable' }}</button></form>
+          <form method="post" action="/settings/clusters/{{ c.id }}/delete" onsubmit="return confirm('Delete this cluster?')"><button class="linkbtn danger" type="submit">delete</button></form>
+        </span>
+      </div>
+      {% endfor %}
+    </div>
+
+    <form class="cluster-add" method="post" action="/settings/clusters">
+      <div class="uplabel" style="width:100%">Add a cluster</div>
+      <input type="text" name="name" placeholder="name (e.g. cucm-east)" required style="width:150px">
+      <input type="text" name="axl_host" placeholder="publisher host / IP" required style="flex:1 1 200px">
+      <input type="text" name="cucm_user" placeholder="service account" style="width:150px">
+      <input type="password" name="cucm_password" placeholder="password" autocomplete="new-password" style="width:150px">
+      <input type="text" name="axl_version" placeholder="12.5" value="12.5" style="width:64px">
+      <label class="chk"><input type="checkbox" name="verify_tls"> TLS</label>
+      <label class="chk"><input type="checkbox" name="phone_web_enabled" checked> Scrape</label>
+      <button class="btn btn-primary" type="submit">Add cluster</button>
+    </form>
+    <div class="footnote"><span>AXL runs on the publisher only. The service account needs Standard AXL API Access + the read-only CCM/Serviceability roles. Passwords are masked and never shown back.</span></div>
+  </div>
+
+  <form method="post" action="/settings">
+  <div class="card">
+    <div class="card-head">
+      <h2>General settings</h2>
+      <span class="subhead">operational config — a value here overrides the .env default</span>
+      <button class="btn btn-primary" type="submit" style="margin-left:auto">Save settings</button>
+    </div>
+    {% for group, fields in setting_groups.items() %}
+    <div class="settings-group">
+      <div class="uplabel">{{ group }}</div>
+      {% for f in fields %}
+      <div class="field-row">
+        <label class="field-label">{{ f.label }}</label>
+        {% if f.kind == 'bool' %}
+          <label class="chk"><input type="checkbox" name="{{ f.key }}" {{ 'checked' if values[f.key] }}> enabled</label>
+        {% elif f.key == 'auth_backend' %}
+          <select class="filter-select" name="{{ f.key }}">
+            <option value="local" {{ 'selected' if values[f.key] == 'local' }}>local</option>
+            <option value="ldap" {{ 'selected' if values[f.key] == 'ldap' }}>ldap</option>
+          </select>
+        {% elif f.secret %}
+          <input class="setting-input" type="password" name="{{ f.key }}" placeholder="unchanged if blank" autocomplete="new-password">
+          {% if values[f.key] == secret_mask %}<span class="hint-set">configured</span>{% endif %}
+        {% else %}
+          <input class="setting-input" type="{{ 'number' if f.kind == 'int' else 'text' }}" name="{{ f.key }}" value="{{ values[f.key] }}">
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+    {% endfor %}
+  </div>
+  </form>
+</div>
+{% endblock %}
