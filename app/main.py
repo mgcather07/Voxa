@@ -12,10 +12,12 @@ from fastapi import (
     BackgroundTasks,
     Depends,
     FastAPI,
+    File,
     Form,
     HTTPException,
     Query,
     Request,
+    UploadFile,
 )
 from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
@@ -24,7 +26,7 @@ from sqlalchemy import desc, func, or_, select
 from sqlalchemy.orm import Session
 from starlette.middleware.sessions import SessionMiddleware
 
-from . import exports, history, locations, report_templates, reports
+from . import exports, history, importer, locations, report_templates, reports
 from .catalog import DEFAULT_FAMILY, FAMILIES, get_catalog
 from .auth import (
     RedirectToLogin,
@@ -519,6 +521,45 @@ def locations_export(
         media_type="text/csv",
         headers={"Content-Disposition": 'attachment; filename="voxa-e911.csv"'},
     )
+
+
+# ---------------------------------------------------------------------------
+# CSV import
+# ---------------------------------------------------------------------------
+@app.get("/import", response_class=HTMLResponse)
+def import_page(
+    request: Request,
+    result: str = "",
+    session: Session = Depends(get_session),
+    user: User = Depends(require_user),
+):
+    return templates.TemplateResponse(
+        "import.html", _ctx(request, session, user, result=result)
+    )
+
+
+@app.post("/import")
+async def import_submit(
+    file: UploadFile = File(...),
+    session: Session = Depends(get_session),
+    user: User = Depends(require_user),
+):
+    raw = await file.read()
+    try:
+        text = raw.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        text = raw.decode("latin-1")
+    summary = importer.import_csv_text(session, text)
+    session.commit()
+    log.info(
+        "CSV import by %s: %s created, %s updated, %s skipped",
+        user.username, summary["created"], summary["updated"], summary["skipped"],
+    )
+    msg = (
+        f"{summary['created']} added, {summary['updated']} updated"
+        f"{', ' + str(summary['skipped']) + ' skipped' if summary['skipped'] else ''}"
+    )
+    return RedirectResponse(url=f"/import?result={msg}", status_code=303)
 
 
 # ---------------------------------------------------------------------------

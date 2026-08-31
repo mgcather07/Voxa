@@ -791,6 +791,25 @@ td.device a:hover { color: var(--blue-bright); }
 .kv-row .v.none { color: var(--ink-3); }
 
 /* ===========================================================================
+   CSV import
+   ========================================================================== */
+.file-input {
+  color: var(--ink-2);
+  font-size: 13px;
+}
+.file-input::file-selector-button {
+  background: var(--surface-3);
+  color: var(--ink-1);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-md);
+  padding: 8px 14px;
+  margin-right: 12px;
+  cursor: pointer;
+  font-size: 13px;
+}
+.file-input::file-selector-button:hover { filter: brightness(1.1); }
+
+/* ===========================================================================
    Call activity
    ========================================================================== */
 .callrow {

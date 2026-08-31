@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}Import CSV &middot; {{ settings.app_name }}{% endblock %}
+{% block page_title %}Import CSV{% endblock %}
+{% block content %}
+
+<div class="card" style="max-width:640px">
+  <div class="card-head">
+    <h2>Import devices from a CSV</h2>
+    <span class="subhead">augment the inventory when the phone web scrape can't</span>
+  </div>
+
+  {% if result %}
+  <div class="readonly" style="border-color:rgba(52,199,89,0.28)">
+    <div class="readonly-head"><span style="color:var(--green)">Imported</span></div>
+    <div class="readonly-body">{{ result }}</div>
+  </div>
+  {% endif %}
+
+  <form method="post" action="/import" enctype="multipart/form-data"
+        style="display:flex; flex-direction:column; gap:14px;">
+    <input class="file-input" type="file" name="file" accept=".csv,text/csv" required>
+    <button type="submit" class="btn btn-primary" style="align-self:flex-start">Upload &amp; import</button>
+  </form>
+
+  <p class="subhead" style="line-height:1.5">
+    Rows are matched on <code class="mono" style="color:var(--cyan)">device_name</code>
+    and upserted; lifecycle, PoE and replacement are derived from the model, just
+    like a collection. Recognised columns:
+  </p>
+  <div class="mono" style="font-size:12px; color:var(--ink-2); line-height:1.7">
+    device_name · description · directory_number · model · device_pool · site ·
+    ip_address · registration_status · serial_number · hardware_revision ·
+    switch_name · switch_port · vlan_id
+  </div>
+  <p class="subhead">Nothing here writes to CUCM — this only updates Voxa's database.</p>
+</div>
+
+{% endblock %}
