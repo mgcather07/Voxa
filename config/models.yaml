@@ -34,6 +34,28 @@ lifecycle_labels:
   current: "Currently sold"
   unknown: "Unknown - verify"
 
+# CUCM registers these as device class "Phone", but they are not physical desk
+# phones — soft clients, virtual ports, and templates. Matched as a
+# case-insensitive substring of the CUCM model string and excluded from the
+# inventory entirely (they have no hardware to refresh and draw no PoE).
+exclude_models:
+  - "Client Services Framework"   # Jabber desktop (CSF)
+  - "Jabber"                       # Jabber for tablet / mobile
+  - "CTI Port"                     # virtual softphone/app port
+  - "Spark Remote Device"          # Webex CTI remote
+  - "Universal Device Template"    # a template, not a device
+  - "Third-party SIP Device"       # non-Cisco generic SIP profile
+
+# Name-based recognition for devices whose CUCM string has no 4-digit model
+# number. Checked (case-insensitive substring) before the numeric extractor.
+model_aliases:
+  "ATA 186": "ata186"
+  "ATA 187": "ata186"
+  "ATA 190": "ata190"
+  "ATA 191": "ata190"
+  "ATA 192": "ata190"
+  "VGC Phone": "vgc"
+
 # Candidate replacement platforms.
 replacements:
   "9841":
@@ -137,6 +159,13 @@ models:
   "9861": {family: "9800", generation: target, poe_class: 3, lifecycle: current, replacement: null, verified: true}
   "9871": {family: "9800", generation: target, poe_class: 3, lifecycle: current, replacement: null, verified: true}
   "8875": {family: "video", generation: target, poe_class: 4, lifecycle: current, replacement: null, verified: false}
+
+  # --- Analog adapters / gateway ports (externally powered, no IP PoE) -----
+  # Recognized by name via model_aliases. poe_class 0 is nominal — these have
+  # no phone web server, so they never carry a switch port into the PoE budget.
+  "ata186": {family: "ata", generation: legacy, poe_class: 0, lifecycle: eol, replacement: null, verified: true}
+  "ata190": {family: "ata", generation: current, poe_class: 0, lifecycle: current, replacement: null, verified: true}
+  "vgc":    {family: "analog", generation: legacy, poe_class: 0, lifecycle: current, replacement: null, verified: true}
 
 # Anything not listed above falls back to this.
 default:

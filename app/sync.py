@@ -152,6 +152,13 @@ def run_sync(settings: Settings | None = None) -> int:
                     (axl_row.model if axl_row else None)
                     or (ris_row.product if ris_row else None)
                 )
+                # Drop non-phones (Jabber/CTI/templates/3rd-party): skip new ones
+                # and delete any previously collected.
+                if catalog.is_excluded(model_raw):
+                    prior = existing.get(name)
+                    if prior is not None:
+                        session.delete(prior)
+                    continue
                 info = catalog.lookup(model_raw)
 
                 phone = existing.get(name)

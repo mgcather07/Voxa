@@ -94,6 +94,12 @@ class Catalog:
         self._replacements: dict[str, dict] = raw.get("replacements", {})
         self._models: dict[str, dict] = raw.get("models", {})
         self._default: dict = raw.get("default", {})
+        # Name-based recognition for devices without a 4-digit model number in
+        # the CUCM string (analog adapters, gateway ports): substring -> key.
+        self._aliases: dict[str, str] = raw.get("model_aliases", {})
+        # CUCM device-class "Phone" entries that are not physical phones (soft
+        # clients, virtual ports, templates): excluded from the inventory.
+        self._exclude: list[str] = [s.lower() for s in raw.get("exclude_models", [])]
         # Admin edits from the DB, keyed by model. Each value may set poe_class,
         # lifecycle, replacement, verified; a set field wins over the YAML.
         self._overrides: dict[str, dict] = overrides or {}
@@ -139,12 +145,23 @@ class Catalog:
             return 0.0
         return self._class_watts.get(int(poe_class), 12.95)
 
-    @staticmethod
-    def extract_key(model_string: str | None) -> str | None:
+    def extract_key(self, model_string: str | None) -> str | None:
         if not model_string:
             return None
+        low = model_string.lower()
+        for sub, key in self._aliases.items():
+            if sub.lower() in low:
+                return key
         match = _MODEL_RE.search(model_string)
         return match.group(1) if match else None
+
+    def is_excluded(self, model_string: str | None) -> bool:
+        """True for CUCM 'Phone' devices that are not physical phones (soft
+        clients, virtual ports, templates) — kept out of the inventory."""
+        if not model_string:
+            return False
+        low = model_string.lower()
+        return any(sub in low for sub in self._exclude)
 
     def lookup(self, model_string: str | None) -> ModelInfo:
         key = self.extract_key(model_string) or "unknown"
@@ -258,6 +275,7 @@ def reapply_to_phones(session) -> int:
     phones = session.query(Phone).all()
     for phone in phones:
         info = catalog.lookup(phone.model_raw)
+        phone.model_key = info.key
         phone.family = info.family
         phone.generation = info.generation
         phone.lifecycle = info.lifecycle
