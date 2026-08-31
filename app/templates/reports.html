@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Reports &middot; {{ settings.app_name }}{% endblock %}
+{% block page_title %}Reports{% endblock %}
+{% block content %}
+
+<div class="card">
+  <div class="card-head">
+    <h2>Report templates</h2>
+    <span class="subhead">view on screen, export to CSV or Excel, or print to PDF</span>
+  </div>
+  <div class="report-grid">
+    {% for key, title, subtitle in report_meta %}
+    <div class="report-card">
+      <div class="report-info">
+        <a class="report-title" href="/reports/{{ key }}">{{ title }}</a>
+        <span class="report-sub">{{ subtitle }}</span>
+      </div>
+      <div class="report-actions">
+        <a class="btn btn-secondary" href="/reports/{{ key }}">View</a>
+        <a class="btn btn-secondary" href="/reports/{{ key }}.csv">CSV</a>
+        <a class="btn btn-secondary" href="/reports/{{ key }}.xlsx">Excel</a>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+{% endblock %}

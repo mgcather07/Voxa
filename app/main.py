@@ -24,7 +24,7 @@ from sqlalchemy import desc, func, or_, select
 from sqlalchemy.orm import Session
 from starlette.middleware.sessions import SessionMiddleware
 
-from . import history, locations, reports
+from . import exports, history, locations, report_templates, reports
 from .catalog import DEFAULT_FAMILY, FAMILIES, get_catalog
 from .auth import (
     RedirectToLogin,
@@ -512,6 +512,76 @@ def locations_export(
         iter([buffer.getvalue()]),
         media_type="text/csv",
         headers={"Content-Disposition": 'attachment; filename="voxa-e911.csv"'},
+    )
+
+
+# ---------------------------------------------------------------------------
+# Reports
+# ---------------------------------------------------------------------------
+@app.get("/reports", response_class=HTMLResponse)
+def reports_page(
+    request: Request,
+    session: Session = Depends(get_session),
+    user: User = Depends(require_user),
+):
+    return templates.TemplateResponse(
+        "reports.html",
+        _ctx(request, session, user, report_meta=report_templates.REPORT_META),
+    )
+
+
+@app.get("/reports/{key}.csv")
+def report_csv(
+    key: str,
+    session: Session = Depends(get_session),
+    user: User = Depends(require_user),
+):
+    report = report_templates.build(session, key)
+    if report is None:
+        raise HTTPException(status_code=404, detail="Unknown report")
+    buffer = io.StringIO()
+    writer = csv.writer(buffer)
+    writer.writerow(report["columns"])
+    writer.writerows(report["rows"])
+    buffer.seek(0)
+    return StreamingResponse(
+        iter([buffer.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="voxa-{key}.csv"'},
+    )
+
+
+@app.get("/reports/{key}.xlsx")
+def report_xlsx(
+    key: str,
+    session: Session = Depends(get_session),
+    user: User = Depends(require_user),
+):
+    report = report_templates.build(session, key)
+    if report is None:
+        raise HTTPException(status_code=404, detail="Unknown report")
+    data = exports.write_xlsx(report["columns"], report["rows"], report["title"])
+    return StreamingResponse(
+        iter([data]),
+        media_type=(
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        ),
+        headers={"Content-Disposition": f'attachment; filename="voxa-{key}.xlsx"'},
+    )
+
+
+@app.get("/reports/{key}", response_class=HTMLResponse)
+def report_view(
+    request: Request,
+    key: str,
+    session: Session = Depends(get_session),
+    user: User = Depends(require_user),
+):
+    report = report_templates.build(session, key)
+    if report is None:
+        raise HTTPException(status_code=404, detail="Unknown report")
+    return templates.TemplateResponse(
+        "report_view.html", _ctx(request, session, user, report=report)
     )
 
 

@@ -51,14 +51,15 @@ switch/port/subnet — the hard half. Writes only to Voxa's own DB.
 - ✅ Phone 360 shows resolved location
 - ✅ E911 CSV export (`/locations/e911.csv`)
 
-## Phase 4 — Reporting upgrades  ⬜
-Call Telemetry's report templates + exports. *Deps: openpyxl (XLSX), and PDF
-lib if we do PDF — ask when we start.*
+## Phase 4 — Reporting upgrades  ✅
+Call Telemetry's report templates + exports. Delivered with **no new
+dependencies**: a tiny hand-rolled XLSX writer, and print-to-PDF via a print
+stylesheet instead of a PDF library.
 
-- ⬜ XLSX export
-- ⬜ Named templates: EoL priority · coverage gaps · by-site · by-model
-- ⬜ Reports page to pick + export
-- ⬜ Optional: scheduled report to SFTP
+- ✅ XLSX export (`app/exports.py`, dependency-free)
+- ✅ Named templates: replace-first (EoL) · discovery gaps · by-site · by-model
+- ✅ `/reports` page: view on screen, CSV / Excel export, print-to-PDF
+- ✅ Scheduled report delivery: `scripts/report.py` dumps files for cron + OS SFTP
 
 ## Phase 5 — CDR/CMR ingest (call analytics)  ⬜
 Call Telemetry's Call Analytics; Voxa roadmap #3. The big one — phased inside.

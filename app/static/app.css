@@ -791,6 +791,51 @@ td.device a:hover { color: var(--blue-bright); }
 .kv-row .v.none { color: var(--ink-3); }
 
 /* ===========================================================================
+   Reports
+   ========================================================================== */
+.report-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 12px;
+}
+.report-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 15px;
+  background: var(--surface-inset);
+  border: 1px solid var(--hairline-soft);
+  border-radius: var(--radius-lg);
+}
+.report-info { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.report-title { font-size: 14px; font-weight: 600; color: var(--ink-1); }
+.report-title:hover { color: var(--blue-bright); }
+.report-sub { font-size: 12px; color: var(--ink-gray); }
+.report-actions { margin-left: auto; display: flex; gap: 6px; }
+.report-actions .btn { min-height: 32px; padding: 0 12px; font-size: 12.5px; }
+.report-doc-actions { margin-left: auto; display: flex; gap: 8px; }
+.report-table td { white-space: normal; }
+
+@media print {
+  .sidebar, .topbar, .footer, .no-print, .backlink { display: none !important; }
+  .shell { display: block; }
+  .content { padding: 0; }
+  body { background: #fff; color: #000; }
+  .card, .report-doc {
+    box-shadow: none;
+    border: none;
+    background: #fff;
+    color: #000;
+  }
+  .scrollbox { max-height: none; overflow: visible; border: none; }
+  table.grid-table thead tr { background: #eee; }
+  table.grid-table th { color: #000; border-bottom: 1px solid #999; }
+  table.grid-table td { color: #000; }
+  table.grid-table tbody tr { border-bottom: 1px solid #ddd; }
+  .card-head h2, .subhead { color: #000; }
+}
+
+/* ===========================================================================
    E911 locations
    ========================================================================== */
 .loc-form, .rule-form {

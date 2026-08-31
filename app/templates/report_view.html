@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}{{ report.title }} &middot; {{ settings.app_name }}{% endblock %}
+{% block page_title %}{{ report.title }}{% endblock %}
+{% block content %}
+
+<a class="backlink no-print" href="/reports">&larr; Reports</a>
+
+<div class="card report-doc">
+  <div class="card-head">
+    <h2>{{ report.title }}</h2>
+    <span class="subhead">{{ report.subtitle }} · {{ report.rows|length }} rows</span>
+    <div class="report-doc-actions no-print">
+      <a class="btn btn-secondary" href="/reports/{{ report.key }}.csv">CSV</a>
+      <a class="btn btn-secondary" href="/reports/{{ report.key }}.xlsx">Excel</a>
+      <button class="btn btn-primary" onclick="window.print()">Print / Save PDF</button>
+    </div>
+  </div>
+
+  {% if not report.rows %}
+    <div class="empty">Nothing to report — no rows match.</div>
+  {% else %}
+  <div class="scrollbox">
+    <table class="grid-table report-table">
+      <thead>
+        <tr>{% for col in report.columns %}<th class="{{ 'num' if col.endswith('%') or col in ['Count','Phones'] }}">{{ col }}</th>{% endfor %}</tr>
+      </thead>
+      <tbody>
+        {% for row in report.rows %}
+        <tr>{% for cell in row %}<td>{{ cell }}</td>{% endfor %}</tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+</div>
+
+{% endblock %}
