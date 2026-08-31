@@ -77,12 +77,12 @@
     <div class="card-head">
       <h2>What changed</h2>
       <span class="subhead">
-        {% if diff.previous %}collection {{ diff.current.finished_at.strftime("%b %d %H:%M") if diff.current.finished_at }} vs {{ diff.previous.finished_at.strftime("%b %d %H:%M") if diff.previous.finished_at }}
+        {% if diff.previous %}collection {{ (diff.current.finished_at | fdt_compact) if diff.current.finished_at }} vs {{ (diff.previous.finished_at | fdt_compact) if diff.previous.finished_at }}
         {% else %}first collection — nothing to compare against yet{% endif %}
       </span>
       <select class="runpick" onchange="location.href='/history?run='+this.value">
         {% for r in runs %}
-        <option value="{{ r.id }}" {{ 'selected' if diff.current.id == r.id }}>{{ r.finished_at.strftime("%b %d %H:%M") if r.finished_at else ("run " ~ r.id) }}</option>
+        <option value="{{ r.id }}" {{ 'selected' if diff.current.id == r.id }}>{{ (r.finished_at | fdt_compact) if r.finished_at else ("run " ~ r.id) }}</option>
         {% endfor %}
       </select>
     </div>

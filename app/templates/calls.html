@@ -35,7 +35,7 @@
         {% endif %}
         {% for c in results %}
         <tr>
-          <td class="mono">{{ c.start.strftime("%Y-%m-%d %H:%M") if c.start else "—" }}</td>
+          <td class="mono">{{ (c.start | fdt) if c.start else "—" }}</td>
           <td class="mono">{{ c.calling_number or "—" }}</td>
           <td class="mono">{{ c.final_called or "—" }}</td>
           <td class="mono ink2">{{ c.devices | join(", ") if c.devices else "—" }}</td>

@@ -99,6 +99,45 @@ def _comma(value):
 templates.env.filters["comma"] = _comma
 
 
+# Date/time display filters — 12-hour clock with AM/PM, no zero-padded day/hour.
+# Written without glibc's %-I/%-d so they render the same on Linux and macOS.
+def _fdt(v):          # "Aug 31, 2026 · 11:46 PM"
+    if v is None:
+        return ""
+    return f"{v.strftime('%b')} {v.day}, {v.year} · {v.strftime('%I:%M %p').lstrip('0')}"
+
+
+def _fdt_secs(v):     # "Aug 31, 2026 · 11:46:05 PM"
+    if v is None:
+        return ""
+    return f"{v.strftime('%b')} {v.day}, {v.year} · {v.strftime('%I:%M:%S %p').lstrip('0')}"
+
+
+def _fdt_compact(v):  # "Aug 31, 11:46 PM"
+    if v is None:
+        return ""
+    return f"{v.strftime('%b')} {v.day}, {v.strftime('%I:%M %p').lstrip('0')}"
+
+
+def _ftime(v):        # "11:46:05 PM"
+    if v is None:
+        return ""
+    return v.strftime('%I:%M:%S %p').lstrip('0')
+
+
+def _fdate(v):        # "Aug 31, 2026"
+    if v is None:
+        return ""
+    return f"{v.strftime('%b')} {v.day}, {v.year}"
+
+
+templates.env.filters["fdt"] = _fdt
+templates.env.filters["fdt_secs"] = _fdt_secs
+templates.env.filters["fdt_compact"] = _fdt_compact
+templates.env.filters["ftime"] = _ftime
+templates.env.filters["fdate"] = _fdate
+
+
 def _timeago(value) -> str:
     """Human 'x ago' for the top-bar collection status line."""
     if value is None:

@@ -15,7 +15,7 @@
   <div class="tiles">
     <div class="tile"><div class="label">Peak concurrent</div>
       <div class="value-row"><span class="value tnum" style="color:var(--cyan)">{{ cap.peak | comma }}</span><span class="unit">calls</span></div>
-      <div class="note">{{ cap.peak_at.strftime("%Y-%m-%d %H:%M") if cap.peak_at else "" }}</div></div>
+      <div class="note">{{ (cap.peak_at | fdt) if cap.peak_at else "" }}</div></div>
     <div class="tile"><div class="label">Traffic</div>
       <div class="value-row"><span class="value tnum">{{ cap.erlangs | comma }}</span><span class="unit">Erlangs</span></div>
       <div class="note">avg simultaneous calls over the range</div></div>
@@ -28,7 +28,7 @@
     <div class="card-head"><h2>Concurrent calls over time</h2><span class="subhead">peak simultaneous calls per interval</span></div>
     <div class="trend" style="height:150px">
       {% for b in cap.series %}
-      <div class="trend-col" title="{{ b.peak }} concurrent · {{ b.start.strftime('%m/%d %H:%M') }}">
+      <div class="trend-col" title="{{ b.peak }} concurrent · {{ b.start | fdt_compact }}">
         <div class="trend-bar" style="border-radius:3px 3px 0 0">
           <div class="fill" style="height:{{ (100 * b.peak / cap.series_max) | round | int }}%;background:linear-gradient(180deg,var(--cyan),var(--blue))"></div>
         </div>

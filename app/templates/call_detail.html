@@ -10,7 +10,7 @@
 <div class="card detail-head">
   <div style="min-width:0">
     <div class="title">{{ first.calling_number or "—" }} &rarr; {{ last.final_called or last.original_called or "—" }}</div>
-    <div class="desc">Call {{ call_key }} · {{ legs|length }} leg{{ '' if legs|length == 1 else 's' }} · started {{ first.orig_time.strftime("%Y-%m-%d %H:%M:%S") if first.orig_time }}</div>
+    <div class="desc">Call {{ call_key }} · {{ legs|length }} leg{{ '' if legs|length == 1 else 's' }} · started {{ (first.orig_time | fdt_secs) if first.orig_time }}</div>
     <div class="tags">
       {% set answered = namespace(v=false) %}
       {% for l in legs %}{% if l.answered %}{% set answered.v = true %}{% endif %}{% endfor %}
@@ -82,8 +82,8 @@
           <td class="num">{{ loop.index }}</td>
           <td class="mono">{{ l.calling_number or "—" }}{% if l.orig_device %}<br><span class="ink2" style="font-size:11px">{{ l.orig_device }}</span>{% endif %}</td>
           <td class="mono">{{ l.final_called or l.original_called or "—" }}{% if l.dest_device %}<br><span class="ink2" style="font-size:11px">{{ l.dest_device }}</span>{% endif %}</td>
-          <td class="mono">{{ l.orig_time.strftime("%H:%M:%S") if l.orig_time else "—" }}</td>
-          <td class="mono">{{ l.connect_time.strftime("%H:%M:%S") if l.connect_time else "—" }}</td>
+          <td class="mono">{{ (l.orig_time | ftime) if l.orig_time else "—" }}</td>
+          <td class="mono">{{ (l.connect_time | ftime) if l.connect_time else "—" }}</td>
           <td class="num tnum">{{ "%d:%02d"|format(l.duration // 60, l.duration % 60) }}</td>
           <td class="ink2">{{ cause_label(l.dest_cause if l.dest_cause is not none else l.orig_cause) }}</td>
           <td class="num tnum" style="color:{{ 'var(--green)' if best and best.mos and best.mos >= 4 else 'var(--orange)' if best and best.mos and best.mos >= 3.5 else 'var(--red)' if best and best.mos else 'var(--ink-3)' }}">{{ best.mos if best and best.mos else "—" }}</td>

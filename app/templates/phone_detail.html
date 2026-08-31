@@ -125,7 +125,7 @@
       <div class="kv-row"><span class="k">Total calls</span><span class="v tnum">{{ call_stat.total_calls | comma }}</span></div>
       <div class="kv-row"><span class="k">In / out</span><span class="v tnum">{{ call_stat.inbound_calls | comma }} in · {{ call_stat.outbound_calls }} out</span></div>
       <div class="kv-row"><span class="k">Talk time</span><span class="v tnum">{{ call_stat.total_minutes | comma }} min</span></div>
-      <div class="kv-row"><span class="k">Last call</span><span class="v tnum">{{ call_stat.last_call_at.strftime("%Y-%m-%d %H:%M UTC") if call_stat.last_call_at else "—" }}</span></div>
+      <div class="kv-row"><span class="k">Last call</span><span class="v tnum">{{ ((call_stat.last_call_at | fdt) ~ " UTC") if call_stat.last_call_at else "—" }}</span></div>
       <div class="kv-row"><span class="k">Avg MOS</span>
         {% if call_stat.avg_mos %}<span class="v tnum" style="color:{{ 'var(--green)' if call_stat.avg_mos >= 4 else 'var(--orange)' if call_stat.avg_mos >= 3.5 else 'var(--red)' }}">{{ call_stat.avg_mos }}</span>
         {% else %}<span class="v none">—</span>{% endif %}
@@ -140,8 +140,8 @@
     <div class="card-head"><h2>Record</h2><span class="subhead">Voxa bookkeeping</span></div>
     <div class="kv">
       {{ kv("pkid", phone.pkid, mono=True) }}
-      {{ kv("First seen", phone.first_seen.strftime("%Y-%m-%d %H:%M UTC") if phone.first_seen) }}
-      {{ kv("Last seen", phone.last_seen.strftime("%Y-%m-%d %H:%M UTC") if phone.last_seen) }}
+      {{ kv("First seen", ((phone.first_seen | fdt) ~ " UTC") if phone.first_seen) }}
+      {{ kv("Last seen", ((phone.last_seen | fdt) ~ " UTC") if phone.last_seen) }}
       {{ kv("Notes", phone.notes) }}
     </div>
   </div>
@@ -154,7 +154,7 @@
   <div class="timeline">
     {% for e in timeline %}
     <div class="tl-row">
-      <span class="tl-when tnum">{{ e.captured_at.strftime("%Y-%m-%d") if e.captured_at }}</span>
+      <span class="tl-when tnum">{{ (e.captured_at | fdate) if e.captured_at }}</span>
       <span class="tl-dot"></span>
       <span class="tl-what">{{ e.changes | join("; ") }}</span>
     </div>

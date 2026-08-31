@@ -31,8 +31,8 @@
           {% for t in tokens %}
           <tr>
             <td>{{ t.label }}</td>
-            <td class="mono ink2">{{ t.created_at.strftime("%Y-%m-%d") if t.created_at }}</td>
-            <td class="mono ink2">{{ t.last_used_at.strftime("%Y-%m-%d %H:%M") if t.last_used_at else "never" }}</td>
+            <td class="mono ink2">{{ (t.created_at | fdate) if t.created_at }}</td>
+            <td class="mono ink2">{{ (t.last_used_at | fdt) if t.last_used_at else "never" }}</td>
             <td class="ink2">{{ t.created_by or "—" }}</td>
             <td><form method="post" action="/integrations/tokens/{{ t.id }}/delete"><button class="linkbtn danger" type="submit">revoke</button></form></td>
           </tr>

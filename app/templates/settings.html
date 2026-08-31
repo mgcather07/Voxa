@@ -74,7 +74,7 @@
             <div class="log-entry">
               <div class="log-head">
                 <span class="conn-badge {{ 'ok' if lg.ok else 'err' }} sm"><span class="dot"></span>{{ 'ok' if lg.ok else 'fail' }}</span>
-                <span class="mono">{{ lg.at.strftime("%Y-%m-%d %H:%M:%S") if lg.at }}</span>
+                <span class="mono">{{ (lg.at | fdt_secs) if lg.at }}</span>
               </div>
               <pre class="log-detail">{{ lg.detail }}</pre>
             </div>
