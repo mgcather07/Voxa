@@ -23,6 +23,12 @@ log = logging.getLogger(__name__)
 
 DEVICE_PATHS = ("/DeviceInformationX", "/DeviceInformation")
 NETWORK_PATHS = ("/NetworkConfigurationX", "/NetworkConfiguration")
+# The CDP/LLDP neighbour (access switch + port) is NOT on NetworkConfiguration
+# for 78xx/88xx phones — that page only holds port *config* (VLAN, CDP on/off).
+# The neighbour lives on PortInformationX (?1 = network/switch port; ?2 = PC
+# port). Older 79xx firmware carried the neighbour on NetworkConfiguration, so
+# we fetch both and merge. Same CDPNeighbor* tag names on all generations.
+PORT_PATHS = ("/PortInformationX?1", "/PortInformationX")
 
 # Tag names vary across firmware generations, so try several per field.
 SERIAL_TAGS = ("serialnumber", "serial", "devserialnumber")
@@ -103,13 +109,19 @@ def fetch_one(ip: str, timeout: float = 4.0) -> PhoneWebInfo:
         ) as client:
             device = _get_xml(client, ip, DEVICE_PATHS)
             network = _get_xml(client, ip, NETWORK_PATHS)
+            port = _get_xml(client, ip, PORT_PATHS)
     except Exception as exc:  # noqa: BLE001 - a phone is never worth crashing on
         info.error = str(exc)
         return info
 
-    if not device and not network:
+    if not device and not network and not port:
         info.error = "no response (web access disabled or phone unreachable)"
         return info
+
+    # Switch/port neighbour is on PortInformationX (78xx/88xx) or, on older
+    # firmware, NetworkConfiguration. VLAN is on NetworkConfiguration. Merge so
+    # a single lookup finds each field wherever this generation puts it.
+    net_and_port = {**network, **port}
 
     info.reachable = True
     info.serial_number = _pick(device, SERIAL_TAGS)
@@ -117,10 +129,10 @@ def fetch_one(ip: str, timeout: float = 4.0) -> PhoneWebInfo:
     info.model_number = _pick(device, MODEL_TAGS)
     info.mac_address = _pick(device, MAC_TAGS)
     info.firmware = _pick(device, FW_TAGS)
-    info.switch_name = _pick(network, SWITCH_NAME_TAGS)
-    info.switch_port = _pick(network, SWITCH_PORT_TAGS)
-    info.switch_ip = _pick(network, SWITCH_IP_TAGS)
-    info.vlan_id = _pick(network, VLAN_TAGS)
+    info.switch_name = _pick(net_and_port, SWITCH_NAME_TAGS)
+    info.switch_port = _pick(net_and_port, SWITCH_PORT_TAGS)
+    info.switch_ip = _pick(net_and_port, SWITCH_IP_TAGS)
+    info.vlan_id = _pick(net_and_port, VLAN_TAGS)
     return info
 
 
