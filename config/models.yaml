@@ -72,33 +72,39 @@ replacements:
     role: "Standard desk phone (previous generation, still deployable)"
     requires: "CUCM 10.5+"
 
+  "9811":
+    name: "Cisco Desk Phone 9811"
+    poe_class: 2
+    role: "Entry-level desk phone"
+    requires: "CUCM 14SU3+ or 15 with current device pack"
+
 models:
   # --- 7900 series, all past end of support -------------------------------
   "7902": {family: "7900", generation: legacy, poe_class: 2, lifecycle: eol, replacement: "9841", verified: false}
   "7905": {family: "7900", generation: legacy, poe_class: 2, lifecycle: eol, replacement: "9841", verified: false}
   "7906": {family: "7900", generation: legacy, poe_class: 2, lifecycle: eol, replacement: "9841", verified: false}
-  "7911": {family: "7900", generation: legacy, poe_class: 2, lifecycle: eol, replacement: "9841", verified: false}
+  "7911": {family: "7900", generation: legacy, poe_class: 2, lifecycle: eol, replacement: "9841", verified: true}
   "7912": {family: "7900", generation: legacy, poe_class: 2, lifecycle: eol, replacement: "9841", verified: false}
   "7931": {family: "7900", generation: legacy, poe_class: 2, lifecycle: eol, replacement: "9841", verified: false}
-  "7940": {family: "7900", generation: legacy, poe_class: 3, lifecycle: eol, replacement: "9841", verified: false}
-  "7941": {family: "7900", generation: legacy, poe_class: 2, lifecycle: eol, replacement: "9841", verified: false}
-  "7942": {family: "7900", generation: legacy, poe_class: 2, lifecycle: eol, replacement: "9841", verified: false}
+  "7940": {family: "7900", generation: legacy, poe_class: 2, lifecycle: eol, replacement: "9841", verified: true}
+  "7941": {family: "7900", generation: legacy, poe_class: 2, lifecycle: eol, replacement: "9841", verified: true}
+  "7942": {family: "7900", generation: legacy, poe_class: 2, lifecycle: eol, replacement: "9841", verified: true}
   "7945": {family: "7900", generation: legacy, poe_class: 3, lifecycle: eol, replacement: "9851", verified: false}
-  "7960": {family: "7900", generation: legacy, poe_class: 3, lifecycle: eol, replacement: "9841", verified: false}
-  "7961": {family: "7900", generation: legacy, poe_class: 2, lifecycle: eol, replacement: "9841", verified: false}
-  "7962": {family: "7900", generation: legacy, poe_class: 2, lifecycle: eol, replacement: "9841", verified: false}
+  "7960": {family: "7900", generation: legacy, poe_class: 2, lifecycle: eol, replacement: "9841", verified: true}
+  "7961": {family: "7900", generation: legacy, poe_class: 2, lifecycle: eol, replacement: "9841", verified: true}
+  "7962": {family: "7900", generation: legacy, poe_class: 2, lifecycle: eol, replacement: "9841", verified: true}
   "7965": {family: "7900", generation: legacy, poe_class: 3, lifecycle: eol, replacement: "9851", verified: false}
   "7975": {family: "7900", generation: legacy, poe_class: 3, lifecycle: eol, replacement: "9851", verified: false}
   # Conference and wireless
   "7936": {family: "conference", generation: legacy, poe_class: 3, lifecycle: eol, replacement: "8832", verified: false}
-  "7937": {family: "conference", generation: legacy, poe_class: 3, lifecycle: eol, replacement: "8832", verified: false}
+  "7937": {family: "conference", generation: legacy, poe_class: 3, lifecycle: eol, replacement: "8832", verified: true}
   "7920": {family: "wireless", generation: legacy, poe_class: 0, lifecycle: eol, replacement: "8821", verified: false}
   "7921": {family: "wireless", generation: legacy, poe_class: 0, lifecycle: eol, replacement: "8821", verified: false}
   "7925": {family: "wireless", generation: legacy, poe_class: 0, lifecycle: eol, replacement: "8821", verified: false}
   "7926": {family: "wireless", generation: legacy, poe_class: 0, lifecycle: eol, replacement: "8821", verified: false}
 
   # --- 6900 series --------------------------------------------------------
-  "6901": {family: "6900", generation: legacy, poe_class: 1, lifecycle: eol, replacement: "9841", verified: false}
+  "6901": {family: "6900", generation: legacy, poe_class: 1, lifecycle: eos, replacement: "9811", verified: true}
   "6911": {family: "6900", generation: legacy, poe_class: 1, lifecycle: eol, replacement: "9841", verified: false}
   "6921": {family: "6900", generation: legacy, poe_class: 2, lifecycle: eol, replacement: "9841", verified: false}
   "6941": {family: "6900", generation: legacy, poe_class: 2, lifecycle: eol, replacement: "9841", verified: false}
@@ -106,21 +112,21 @@ models:
   "6961": {family: "6900", generation: legacy, poe_class: 2, lifecycle: eol, replacement: "9841", verified: false}
 
   # --- 7800 series - still supported, superseded by the 9800 --------------
-  "7811": {family: "7800", generation: current, poe_class: 1, lifecycle: eos, replacement: "9841", verified: false}
-  "7821": {family: "7800", generation: current, poe_class: 1, lifecycle: eos, replacement: "9841", verified: false}
+  "7811": {family: "7800", generation: current, poe_class: 1, lifecycle: eos, replacement: "9811", verified: true}
+  "7821": {family: "7800", generation: current, poe_class: 1, lifecycle: eos, replacement: "9841", verified: true}
   "7832": {family: "conference", generation: current, poe_class: 3, lifecycle: eos, replacement: "8832", verified: false}
-  "7841": {family: "7800", generation: current, poe_class: 2, lifecycle: eos, replacement: "9841", verified: false}
+  "7841": {family: "7800", generation: current, poe_class: 1, lifecycle: current, replacement: "9841", verified: true}
   "7861": {family: "7800", generation: current, poe_class: 2, lifecycle: eos, replacement: "9851", verified: false}
 
   # --- 8800 series --------------------------------------------------------
-  "8811": {family: "8800", generation: current, poe_class: 2, lifecycle: eos, replacement: "9841", verified: false}
-  "8831": {family: "conference", generation: legacy, poe_class: 3, lifecycle: eol, replacement: "8832", verified: false}
-  "8832": {family: "conference", generation: current, poe_class: 4, lifecycle: current, replacement: null, verified: false}
-  "8841": {family: "8800", generation: current, poe_class: 2, lifecycle: eos, replacement: "9841", verified: false}
+  "8811": {family: "8800", generation: current, poe_class: 2, lifecycle: current, replacement: "9841", verified: true}
+  "8831": {family: "conference", generation: legacy, poe_class: 3, lifecycle: eol, replacement: "8832", verified: true}
+  "8832": {family: "conference", generation: current, poe_class: 3, lifecycle: current, replacement: null, verified: true}
+  "8841": {family: "8800", generation: current, poe_class: 2, lifecycle: current, replacement: "9841", verified: true}
   "8845": {family: "8800", generation: current, poe_class: 3, lifecycle: eos, replacement: "8875", verified: false}
-  "8851": {family: "8800", generation: current, poe_class: 2, lifecycle: eos, replacement: "9851", verified: false}
+  "8851": {family: "8800", generation: current, poe_class: 3, lifecycle: current, replacement: "9851", verified: true}
   "8861": {family: "8800", generation: current, poe_class: 3, lifecycle: eos, replacement: "9851", verified: false}
-  "8865": {family: "8800", generation: current, poe_class: 4, lifecycle: eos, replacement: "8875", verified: false}
+  "8865": {family: "8800", generation: current, poe_class: 4, lifecycle: eos, replacement: "8875", verified: true}
   "8821": {family: "wireless", generation: current, poe_class: 0, lifecycle: current, replacement: null, verified: false}
 
   # --- 9800 series - the target platform ----------------------------------
