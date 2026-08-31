@@ -27,6 +27,7 @@ from sqlalchemy.orm import Session
 from starlette.middleware.sessions import SessionMiddleware
 
 from . import (
+    analytics,
     calls,
     exports,
     history,
@@ -685,6 +686,17 @@ def calls_page(
                 "answered": answered,
             },
         ),
+    )
+
+
+@app.get("/analytics", response_class=HTMLResponse)
+def analytics_page(
+    request: Request,
+    session: Session = Depends(get_session),
+    user: User = Depends(require_user),
+):
+    return templates.TemplateResponse(
+        "analytics.html", _ctx(request, session, user, a=analytics.overview(session))
     )
 
 

@@ -110,10 +110,10 @@ Voxa. This wave stores raw CDR/CMR records (not just the Phase-5 aggregates).
      ANSWER / RELEASE arrows ordered in time
 - ✅ Calls linked from Phone 360
 
-## Phase 9 — Call analytics dashboard  ⬜
-- ⬜ `/analytics`: call volume over time, busy hour, top talkers
-- ⬜ Quality distribution (MOS buckets), disconnect-cause breakdown
-- ⬜ Missed-call summary (read-only, from CDR)
+## Phase 9 — Call analytics dashboard  ✅
+- ✅ `/analytics`: call volume over 14 days, busy hour, top talkers
+- ✅ Quality distribution (MOS buckets), disconnect-cause breakdown
+- ✅ Missed-call summary (answered % / missed %), fleet avg MOS
 
 ## Phase 10 — Gateway / trunk health & CUCM insight  ⬜
 - ⬜ Gateway/trunk call volume + utilization from CDR

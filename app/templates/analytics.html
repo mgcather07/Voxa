@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% block title %}Call analytics &middot; {{ settings.app_name }}{% endblock %}
+{% block page_title %}Call analytics{% endblock %}
+{% block content %}
+
+{% if not a.has_data %}
+  <div class="card"><div class="empty">
+    <h2>No call data yet</h2>
+    <p>Ingest CDR/CMR files, or seed mock data with
+      <code>python scripts/mock_data.py</code>.</p>
+  </div></div>
+{% else %}
+
+<div class="section">
+  <div class="tiles">
+    <div class="tile"><div class="label">Calls (14 days)</div>
+      <div class="value-row"><span class="value tnum">{{ "{:,}".format(a.total_calls) }}</span></div>
+      <div class="note">across the fleet</div></div>
+    <div class="tile"><div class="label">Answered</div>
+      <div class="value-row"><span class="value tnum" style="color:var(--green)">{{ a.answered_pct }}%</span></div>
+      <div class="progress"><span style="width:{{ a.answered_pct }}%;background:var(--green)"></span></div>
+      <div class="note">{{ a.missed }} missed ({{ a.missed_pct }}%)</div></div>
+    <div class="tile"><div class="label">Fleet avg MOS</div>
+      <div class="value-row"><span class="value tnum" style="color:{{ 'var(--green)' if a.avg_mos and a.avg_mos >= 4 else 'var(--orange)' }}">{{ a.avg_mos or "—" }}</span></div>
+      <div class="note">call quality</div></div>
+    <div class="tile"><div class="label">Busy hour</div>
+      <div class="value-row"><span class="value tnum">{{ "%02d:00"|format(a.busy_hour.hour) if a.busy_hour else "—" }}</span></div>
+      <div class="note">{{ a.busy_hour.total if a.busy_hour else 0 }} calls started</div></div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h2>Call volume</h2><span class="subhead">calls started per day, answered shaded</span></div>
+    <div class="trend" style="height:150px">
+      {% for d in a.day_series %}
+      <div class="trend-col" title="{{ d.total }} calls · {{ d.answered }} answered">
+        <div class="trend-bar">
+          <div class="fill" style="height:{{ (100 * d.total / a.day_max) | round | int }}%"></div>
+        </div>
+        <div class="trend-n tnum">{{ d.total }}</div>
+        <div class="trend-day">{{ d.day.strftime("%m/%d") }}</div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h2>Busy hour</h2><span class="subhead">calls started by hour of day</span></div>
+    <div class="trend" style="height:120px">
+      {% for h in a.hour_series %}
+      <div class="trend-col" title="{{ h.total }} calls at {{ '%02d:00'|format(h.hour) }}">
+        <div class="trend-bar" style="border-radius:4px 4px 0 0">
+          <div class="fill" style="height:{{ (100 * h.total / a.hour_max) | round | int }}%;background:linear-gradient(180deg,var(--cyan),var(--blue))"></div>
+        </div>
+        <div class="trend-day">{{ "%02d"|format(h.hour) }}</div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="grid dash-two">
+    <div class="card">
+      <div class="card-head"><h2>Top talkers</h2><span class="subhead">busiest extensions</span></div>
+      {% for t in a.top_talkers %}
+      <div class="plan-line" style="padding:6px 0">
+        <span class="name mono" style="min-width:110px">{{ t.number }}</span>
+        <div class="track"><span class="barc-1" style="width:{{ (100 * t.calls / a.talker_max) | round | int }}%"></span></div>
+        <span class="count tnum">{{ t.calls }}</span>
+      </div>
+      {% endfor %}
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h2>Call quality</h2><span class="subhead">MOS distribution</span></div>
+      {% for qb in a.quality %}
+      <div class="plan-line" style="padding:7px 0">
+        <span class="name" style="min-width:150px">{{ qb.label }} <span style="color:var(--ink-3)">{{ qb.range }}</span></span>
+        <div class="track"><span style="width:{{ (100 * qb.count / a.quality_total) | round | int }}%;background:{{ qb.color }};display:block;height:100%;border-radius:999px"></span></div>
+        <span class="count tnum">{{ qb.count }}</span>
+      </div>
+      {% endfor %}
+
+      <div class="card-head" style="margin-top:8px"><h2>Disconnect causes</h2><span class="subhead">why calls ended (unanswered)</span></div>
+      {% for cz in a.causes %}
+      <div class="kv-row"><span class="k" style="text-transform:none;letter-spacing:0">{{ cz.label }}</span><span class="v tnum">{{ cz.count }}</span></div>
+      {% else %}
+      <div class="muted" style="font-size:12.5px">No unanswered calls with a cause.</div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+{% endif %}
+{% endblock %}
