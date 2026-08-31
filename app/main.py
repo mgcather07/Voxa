@@ -101,6 +101,15 @@ def _comma(value):
 
 templates.env.filters["comma"] = _comma
 
+# Cache-buster for /static/app.css so CSS changes reach browsers after a deploy
+# (recomputed on startup; a redeploy restarts the app and bumps it).
+try:
+    templates.env.globals["asset_v"] = str(
+        int((BASE_DIR / "static" / "app.css").stat().st_mtime)
+    )
+except OSError:
+    templates.env.globals["asset_v"] = "0"
+
 
 # Date/time display filters — 12-hour clock with AM/PM, no zero-padded day/hour.
 # Written without glibc's %-I/%-d so they render the same on Linux and macOS.
@@ -331,9 +340,7 @@ def dashboard(
             unverified=reports.unverified_models(session),
             call_activity=reports.call_activity(session),
             clusters=reports.clusters(session),
-            nodes=session.scalars(
-                select(ClusterNode).order_by(ClusterNode.cluster, ClusterNode.node_id)
-            ).all(),
+            topology=reports.cluster_topology(session),
         ),
     )
 

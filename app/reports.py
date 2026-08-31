@@ -8,7 +8,11 @@ from sqlalchemy import case, func, select
 from sqlalchemy.orm import Session
 
 from .catalog import DEFAULT_FAMILY, get_catalog
-from .models import CallStat, Phone, SwitchPoll
+from .models import CallStat, ClusterNode, Phone, SwitchPoll
+
+# Show the imbalance banner once the busiest node passes this share of the
+# cluster's live registrations.
+BUSIEST_SHARE_WARN = 35
 
 
 @dataclass
@@ -363,3 +367,74 @@ def unverified_models(session: Session) -> list[str]:
             if not catalog.lookup(raw).verified
         }
     )
+
+
+# ---------------------------------------------------------------------------
+# Cluster topology (the dashboard "Cluster nodes" card)
+# ---------------------------------------------------------------------------
+_ROLE_RANK = {"publisher": 0, "subscriber": 1, "im_p": 2}
+_ROLE_LABEL = {
+    "publisher": "PUBLISHER",
+    "subscriber": "SUBSCRIBER",
+    "im_p": "IM & PRESENCE",
+}
+
+
+def _node_role(node: ClusterNode) -> str:
+    """Derive publisher / subscriber / im_p from the CUCM role + description."""
+    if "presence" in (node.role or "").lower():
+        return "im_p"
+    if "publisher" in (node.description or "").lower():
+        return "publisher"
+    return "subscriber"
+
+
+def cluster_topology(session: Session) -> dict:
+    """One view model for the Cluster nodes card: nodes enriched with role,
+    service, live-registration share and bar width, plus the busiest-node call
+    out. `registered` is RisPort live registrations, not configured devices.
+    `nodes` is empty when no topology has been collected."""
+    nodes = list(session.scalars(select(ClusterNode)).all())
+    if not nodes:
+        return {"nodes": [], "count": 0, "total": 0, "busiest_share": 0,
+                "hot_name": "", "imbalanced": False}
+
+    total = sum(n.registered_devices for n in nodes)
+    peak = max((n.registered_devices for n in nodes), default=0)
+    hot = max(nodes, key=lambda n: n.registered_devices)
+
+    def share_text(count: int) -> str:
+        if not total or not count:
+            return "0%"
+        pct = round(100 * count / total)
+        return "<1%" if pct == 0 else f"{pct}%"
+
+    rows = []
+    for n in nodes:
+        role = _node_role(n)
+        count = n.registered_devices
+        rows.append({
+            "name": n.name,
+            "description": n.description or "",
+            "role": role,
+            "role_cls": {"publisher": "pub", "subscriber": "sub", "im_p": "imp"}[role],
+            "role_label": _ROLE_LABEL[role],
+            "is_imp": role == "im_p",
+            "service": "IM&P" if role == "im_p" else "Voice/Video",
+            "count": count,
+            "is_zero": count == 0,
+            "share": share_text(count),
+            "bar_w": round(100 * count / peak) if peak else 0,
+            "is_hot": n is hot and count > 0,
+        })
+    rows.sort(key=lambda r: (_ROLE_RANK[r["role"]], -r["count"]))
+
+    busiest_share = round(100 * peak / total) if total else 0
+    return {
+        "nodes": rows,
+        "count": len(rows),
+        "total": total,
+        "busiest_share": busiest_share,
+        "hot_name": hot.name,
+        "imbalanced": busiest_share > BUSIEST_SHARE_WARN,
+    }

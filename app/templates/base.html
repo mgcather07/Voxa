@@ -8,7 +8,7 @@
   <title>{% block title %}{{ app_name }}{% endblock %}</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/htmx/1.9.12/htmx.min.js"></script>
   <script>htmx.config.useTemplateFragments = true;</script>
-  <link rel="stylesheet" href="/static/app.css">
+  <link rel="stylesheet" href="/static/app.css?v={{ asset_v }}">
 </head>
 <body>
 {% set path = request.url.path %}

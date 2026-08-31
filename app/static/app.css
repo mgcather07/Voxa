@@ -1489,6 +1489,104 @@ td.delta.zero { color: var(--ink-3); }
   flex-wrap: wrap;
 }
 
+/* ---------------------------------------------------------------------------
+   Cluster nodes card (dashboard) — role-sorted topology with load bars
+   --------------------------------------------------------------------------- */
+.cnodes {
+  background: var(--surface-2);
+  border: 1px solid var(--hairline-soft);
+  border-radius: 20px;
+  padding: 16px 18px 6px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  display: flex; flex-direction: column; gap: 14px;
+}
+.cnodes-head { display: flex; align-items: flex-end; gap: 16px; flex-wrap: wrap; }
+.cnodes-titles { display: flex; flex-direction: column; gap: 4px; }
+.cnodes-titles h2 { margin: 0; font-size: 15px; font-weight: 700; }
+.cnodes-sub { font-size: 12.5px; color: var(--ink-gray); }
+.cnodes-stats { margin-left: auto; display: flex; align-items: stretch; gap: 22px; }
+.cn-stat { display: flex; flex-direction: column; gap: 3px; }
+.cn-stat-l {
+  font-size: 10px; font-weight: 700; letter-spacing: 0.9px;
+  text-transform: uppercase; color: var(--ink-gray);
+}
+.cn-stat-v { display: flex; align-items: baseline; gap: 5px; }
+.cn-stat-v b { font-size: 21px; font-weight: 800; letter-spacing: -0.5px; line-height: 1; color: var(--ink-1); }
+.cn-stat-v i { font-style: normal; font-size: 11px; color: var(--ink-3); }
+
+.cnodes-banner {
+  display: flex; align-items: flex-start; gap: 11px;
+  border: 1px solid rgba(255, 159, 10, 0.28);
+  background: color-mix(in srgb, var(--orange) 8%, transparent);
+  border-radius: 14px; padding: 11px 13px;
+}
+.cnodes-banner svg { flex: none; margin-top: 1px; }
+.cnodes-banner > div { font-size: 12.5px; color: var(--ink-2); line-height: 1.45; }
+.cnodes-banner b { color: var(--ink-1); font-weight: 600; }
+
+.cnodes-grid {
+  display: grid;
+  grid-template-columns: minmax(158px, 0.85fr) minmax(0, 1fr) 108px 240px;
+  column-gap: 14px;
+}
+.cnodes-hrow {
+  font-size: 10px; font-weight: 700; letter-spacing: 0.9px; text-transform: uppercase;
+  color: var(--ink-3); border-bottom: 1px solid var(--hairline-soft); padding-bottom: 9px;
+}
+.cnodes-hrow .cn-r { text-align: right; }
+
+.cnode-row {
+  align-items: center; padding: 5px 0 7px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.045); font-size: 13px;
+}
+.cnode-row.pub { --role: var(--cyan); }
+.cnode-row.sub { --role: var(--blue); }
+.cnode-row.imp { --role: var(--purple); }
+
+.cn-node { display: flex; align-items: center; gap: 9px; min-width: 0; }
+.cn-rail { width: 3px; height: 24px; border-radius: 2px; background: var(--role); flex: none; }
+.cn-idn { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.cn-name {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-weight: 600; white-space: nowrap; font-size: 12.5px;
+}
+.cn-role { font-size: 10px; font-weight: 700; letter-spacing: 0.9px; text-transform: uppercase; color: var(--role); }
+.cn-desc { color: var(--ink-2); font-size: 12.5px; padding-right: 12px; }
+
+.cn-badge {
+  display: inline-block; border-radius: 999px; padding: 3px 9px;
+  font-size: 11px; font-weight: 700; letter-spacing: 0.9px; text-transform: uppercase;
+  border: 1px solid transparent;
+}
+.cn-badge.voice {
+  color: var(--green);
+  background: color-mix(in srgb, var(--green) 18%, transparent);
+  border-color: color-mix(in srgb, var(--green) 35%, transparent);
+}
+.cn-badge.imp {
+  color: var(--ink-gray);
+  background: color-mix(in srgb, var(--ink-gray) 18%, transparent);
+  border-color: color-mix(in srgb, var(--ink-gray) 35%, transparent);
+}
+
+.cn-reg { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+.cn-reg-top { display: flex; align-items: baseline; gap: 7px; }
+.cn-count { font-size: 15px; font-weight: 700; color: var(--ink-1); }
+.cn-count.zero { color: var(--ink-3); }
+.cn-share { font-size: 11.5px; color: var(--ink-gray); }
+.cn-bar {
+  width: 100%; height: 5px; border-radius: 999px;
+  background: var(--surface-inset); overflow: hidden; display: block;
+}
+.cn-bar-fill { display: block; height: 100%; border-radius: 999px; background: var(--role); }
+.cnode-row.hot .cn-bar-fill { background: var(--orange); }
+
+.cnodes-foot {
+  display: flex; gap: 18px; flex-wrap: wrap;
+  font-size: 11.5px; color: var(--ink-gray); padding: 2px 0 12px;
+}
+.cnodes-foot .cn-foot-r { margin-left: auto; }
+
 @media (prefers-reduced-motion: reduce) {
   * { animation: none !important; transition: none !important; }
 }
