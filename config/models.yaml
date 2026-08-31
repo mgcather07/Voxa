@@ -38,17 +38,17 @@ lifecycle_labels:
 replacements:
   "9841":
     name: "Cisco Desk Phone 9841"
-    poe_class: 3
+    poe_class: 2
     role: "Standard desk phone"
     requires: "CUCM 14SU3+ or 15 with current device pack"
   "9851":
     name: "Cisco Desk Phone 9851"
-    poe_class: 4
+    poe_class: 3
     role: "Executive / multi-line, larger display"
     requires: "CUCM 14SU3+ or 15 with current device pack"
   "9871":
     name: "Cisco Desk Phone 9871"
-    poe_class: 4
+    poe_class: 3
     role: "Executive touchscreen"
     requires: "CUCM 14SU3+ or 15 with current device pack"
   "8875":
@@ -130,10 +130,10 @@ models:
   "8821": {family: "wireless", generation: current, poe_class: 0, lifecycle: current, replacement: null, verified: false}
 
   # --- 9800 series - the target platform ----------------------------------
-  "9841": {family: "9800", generation: target, poe_class: 3, lifecycle: current, replacement: null, verified: false}
-  "9851": {family: "9800", generation: target, poe_class: 4, lifecycle: current, replacement: null, verified: false}
-  "9861": {family: "9800", generation: target, poe_class: 4, lifecycle: current, replacement: null, verified: false}
-  "9871": {family: "9800", generation: target, poe_class: 4, lifecycle: current, replacement: null, verified: false}
+  "9841": {family: "9800", generation: target, poe_class: 2, lifecycle: current, replacement: null, verified: true}
+  "9851": {family: "9800", generation: target, poe_class: 3, lifecycle: current, replacement: null, verified: true}
+  "9861": {family: "9800", generation: target, poe_class: 3, lifecycle: current, replacement: null, verified: true}
+  "9871": {family: "9800", generation: target, poe_class: 3, lifecycle: current, replacement: null, verified: true}
   "8875": {family: "video", generation: target, poe_class: 4, lifecycle: current, replacement: null, verified: false}
 
 # Anything not listed above falls back to this.
