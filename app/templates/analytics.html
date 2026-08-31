@@ -24,7 +24,7 @@
       <div class="value-row"><span class="value tnum" style="color:{{ 'var(--green)' if a.avg_mos and a.avg_mos >= 4 else 'var(--orange)' }}">{{ a.avg_mos or "—" }}</span></div>
       <div class="note">call quality</div></div>
     <div class="tile"><div class="label">Busy hour</div>
-      <div class="value-row"><span class="value tnum">{{ "%02d:00"|format(a.busy_hour.hour) if a.busy_hour else "—" }}</span></div>
+      <div class="value-row"><span class="value tnum">{{ (a.busy_hour.hour | hclock) if a.busy_hour else "—" }}</span></div>
       <div class="note">{{ (a.busy_hour.total if a.busy_hour else 0) | comma }} calls started</div></div>
   </div>
 
@@ -47,11 +47,11 @@
     <div class="card-head"><h2>Busy hour</h2><span class="subhead">calls started by hour of day</span></div>
     <div class="trend" style="height:120px">
       {% for h in a.hour_series %}
-      <div class="trend-col" title="{{ h.total | comma }} calls at {{ '%02d:00'|format(h.hour) }}">
+      <div class="trend-col" title="{{ h.total | comma }} calls at {{ h.hour | hlabel }}">
         <div class="trend-bar" style="border-radius:4px 4px 0 0">
           <div class="fill" style="height:{{ (100 * h.total / a.hour_max) | round | int }}%;background:linear-gradient(180deg,var(--cyan),var(--blue))"></div>
         </div>
-        <div class="trend-day">{{ "%02d"|format(h.hour) }}</div>
+        <div class="trend-day">{{ h.hour | hax }}</div>
       </div>
       {% endfor %}
     </div>

@@ -138,6 +138,30 @@ templates.env.filters["ftime"] = _ftime
 templates.env.filters["fdate"] = _fdate
 
 
+# Hour-of-day (0-23 int) as a 12-hour clock, for busy-hour labels/axes.
+def _hclock(h):       # 14 -> "2:00 PM"
+    if h is None:
+        return "—"
+    return f"{h % 12 or 12}:00 {'AM' if h < 12 else 'PM'}"
+
+
+def _hlabel(h):       # 14 -> "2 PM"
+    if h is None:
+        return ""
+    return f"{h % 12 or 12} {'AM' if h < 12 else 'PM'}"
+
+
+def _hax(h):          # 14 -> "2p", 0 -> "12a"
+    if h is None:
+        return ""
+    return f"{h % 12 or 12}{'a' if h < 12 else 'p'}"
+
+
+templates.env.filters["hclock"] = _hclock
+templates.env.filters["hlabel"] = _hlabel
+templates.env.filters["hax"] = _hax
+
+
 def _timeago(value) -> str:
     """Human 'x ago' for the top-bar collection status line."""
     if value is None:

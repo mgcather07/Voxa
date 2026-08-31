@@ -124,7 +124,7 @@ def _missed_calls(session: Session):
     columns = ["When", "Calling", "Called", "Orig device", "Cause"]
     data = [
         [
-            r.orig_time.strftime("%Y-%m-%d %H:%M:%S") if r.orig_time else "",
+            r.orig_time.strftime("%b %d, %Y %I:%M:%S %p") if r.orig_time else "",
             r.calling_number or "", r.final_called or r.original_called or "",
             r.orig_device or "",
             cause_label(r.dest_cause if r.dest_cause is not None else r.orig_cause),

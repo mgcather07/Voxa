@@ -256,7 +256,7 @@ def build_ladder(legs: list[CallRecord]) -> dict | None:
             "mid": (x1 + x2) / 2,
             "label": e["label"], "kind": e["kind"],
             "dir": 1 if x2 >= x1 else -1,
-            "time": e["t"].strftime("%H:%M:%S") if e["t"] else "",
+            "time": e["t"].strftime("%I:%M:%S %p").lstrip("0") if e["t"] else "",
         })
 
     return {
