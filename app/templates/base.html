@@ -64,11 +64,12 @@
         <span class="bar"></span>Reports
       </a>
       {% if not user or user.is_admin %}
-      <a class="nav-item {{ 'on' if path == '/integrations' }}" href="/integrations">
-        <span class="bar"></span>Integrations
-      </a>
+      <div class="nav-group">System</div>
       <a class="nav-item {{ 'on' if path == '/settings' }}" href="/settings">
         <span class="bar"></span>Settings
+      </a>
+      <a class="nav-item {{ 'on' if path == '/integrations' }}" href="/integrations">
+        <span class="bar"></span>Integrations
       </a>
       {% endif %}
     </nav>

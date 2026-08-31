@@ -27,11 +27,12 @@ def main() -> int:
         print(f"CUCM host : {conn.host}")
         print(f"User      : {conn.user}")
         print(f"AXL ver   : {conn.axl_version}")
-        for r in probe(conn):
+        result = probe(conn)
+        for r in result["checks"]:
             tag = "ok " if r["ok"] else "FAIL"
             print(f"[{tag}] {r['check']}: {r['detail']}")
-            if not r["ok"]:
-                failed += 1
+        if not result["ok"]:
+            failed += 1
     return 1 if failed else 0
 
 

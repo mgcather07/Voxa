@@ -60,6 +60,7 @@ from .models import (
     ApiToken,
     CallStat,
     Cluster,
+    ClusterTestLog,
     Location,
     LocationRule,
     Phone,
@@ -798,17 +799,66 @@ def _truthy(value: str) -> bool:
     return str(value).strip().lower() in {"on", "true", "1", "yes"}
 
 
+def _run_cluster_probe(session: Session, cluster: Cluster) -> dict:
+    """Test a cluster connection and record the result as a log entry, so the
+    UI can show green/red status, the discovered nodes, and the failure reason."""
+    conn = settings_store.ClusterConn(
+        name=cluster.name, host=cluster.axl_host, user=cluster.cucm_user,
+        password=cluster.cucm_password, axl_version=cluster.axl_version,
+        verify_tls=cluster.verify_tls, phone_web_enabled=cluster.phone_web_enabled,
+    )
+    result = probe_cluster(conn)
+    detail = "\n".join(
+        f"[{'ok' if c['ok'] else 'FAIL'}] {c['check']}: {c['detail']}"
+        for c in result["checks"]
+    )
+    summary = "; ".join(
+        f"{c['check']}: {'ok' if c['ok'] else 'FAIL'}" for c in result["checks"]
+    )
+    session.add(ClusterTestLog(
+        cluster_id=cluster.id, ok=result["ok"], summary=summary,
+        detail=detail, nodes="\n".join(result["nodes"]),
+    ))
+    cluster.last_test_at = utcnow()
+    cluster.last_test_result = summary
+    session.commit()
+    return result
+
+
+def _latest_logs(session: Session) -> dict[int, ClusterTestLog]:
+    logs = session.scalars(
+        select(ClusterTestLog).order_by(ClusterTestLog.id.desc())
+    ).all()
+    latest: dict[int, ClusterTestLog] = {}
+    for log_row in logs:
+        latest.setdefault(log_row.cluster_id, log_row)
+    return latest
+
+
+def _recent_logs(session: Session, cluster_id: int, limit: int = 6):
+    return session.scalars(
+        select(ClusterTestLog)
+        .where(ClusterTestLog.cluster_id == cluster_id)
+        .order_by(ClusterTestLog.id.desc())
+        .limit(limit)
+    ).all()
+
+
 def _settings_ctx(request, session, user, **extra):
     groups: dict[str, list] = {}
     for key, kind, secret, group, label in settings_store.SCHEMA:
         groups.setdefault(group, []).append(
             {"key": key, "kind": kind, "secret": secret, "label": label}
         )
+    clusters = session.scalars(select(Cluster).order_by(Cluster.id)).all()
+    latest = _latest_logs(session)
     return _ctx(
         request, session, user,
         setting_groups=groups,
         values=settings_store.form_values(session),
-        clusters=session.scalars(select(Cluster).order_by(Cluster.id)).all(),
+        clusters=clusters,
+        cluster_status=latest,
+        cluster_logs={c.id: _recent_logs(session, c.id) for c in clusters},
         secret_mask=settings_store.SECRET_MASK,
         **extra,
     )
@@ -848,14 +898,16 @@ def cluster_add(
     user: User = Depends(require_admin),
 ):
     if name.strip() and axl_host.strip():
-        session.add(Cluster(
+        cluster = Cluster(
             name=name.strip(), axl_host=axl_host.strip(),
             cucm_user=cucm_user.strip(), cucm_password=cucm_password,
             axl_version=axl_version.strip() or "12.5",
             verify_tls=_truthy(verify_tls),
             phone_web_enabled=_truthy(phone_web_enabled),
-        ))
+        )
+        session.add(cluster)
         session.commit()
+        _run_cluster_probe(session, cluster)  # immediate green/red status
     return RedirectResponse(url="/settings", status_code=303)
 
 
@@ -884,6 +936,7 @@ def cluster_edit(
         c.verify_tls = _truthy(verify_tls)
         c.phone_web_enabled = _truthy(phone_web_enabled)
         session.commit()
+        _run_cluster_probe(session, c)  # re-test after a change
     return RedirectResponse(url="/settings", status_code=303)
 
 
@@ -921,22 +974,13 @@ def cluster_test(
     user: User = Depends(require_admin),
 ):
     c = session.get(Cluster, cluster_id)
-    results = []
-    if c:
-        conn = settings_store.ClusterConn(
-            name=c.name, host=c.axl_host, user=c.cucm_user,
-            password=c.cucm_password, axl_version=c.axl_version,
-            verify_tls=c.verify_tls, phone_web_enabled=c.phone_web_enabled,
-        )
-        results = probe_cluster(conn)
-        c.last_test_at = utcnow()
-        c.last_test_result = "; ".join(
-            f"{r['check']}: {'ok' if r['ok'] else 'FAIL'}" for r in results
-        )
-        session.commit()
+    result = _run_cluster_probe(session, c) if c else {"checks": []}
     return templates.TemplateResponse(
         "settings.html",
-        _settings_ctx(request, session, user, test_results=results, tested_id=cluster_id),
+        _settings_ctx(
+            request, session, user,
+            test_results=result["checks"], tested_id=cluster_id,
+        ),
     )
 
 

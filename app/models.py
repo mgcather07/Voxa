@@ -232,6 +232,24 @@ class Cluster(Base):
     last_test_result: Mapped[str | None] = mapped_column(Text)
 
 
+class ClusterTestLog(Base):
+    """A connection-test attempt against a cluster — the log behind the green/red
+    status and the 'why did it fail' detail in the UI."""
+
+    __tablename__ = "cluster_test_logs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    cluster_id: Mapped[int] = mapped_column(Integer, index=True)
+    at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    ok: Mapped[bool] = mapped_column(Boolean, default=False)
+    summary: Mapped[str | None] = mapped_column(String(255))
+    detail: Mapped[str | None] = mapped_column(Text)
+    nodes: Mapped[str | None] = mapped_column(Text)  # newline-separated
+
+    def node_list(self) -> list[str]:
+        return [n for n in (self.nodes or "").split("\n") if n]
+
+
 class Setting(Base):
     """Operational config as key/value, edited in the Settings UI (DB overrides
     the env default). Bootstrap settings — DATABASE_URL, SECRET_KEY — stay in env
