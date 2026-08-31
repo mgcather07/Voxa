@@ -819,6 +819,25 @@ td.device a:hover { color: var(--blue-bright); }
 .file-input::file-selector-button:hover { filter: brightness(1.1); }
 
 /* ===========================================================================
+   Calls (CDR search + trace)
+   ========================================================================== */
+.callfilter { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.callfilter .search { flex: 0 1 300px; min-width: 240px; }
+.callfilter input[type="date"], .callfilter input[type="number"] { color-scheme: dark; }
+
+.ladder-wrap { overflow-x: auto; border-radius: var(--radius-lg); }
+.ladder { display: block; }
+.ladder-legend {
+  display: flex;
+  gap: 18px;
+  font-size: 12px;
+  color: var(--ink-2);
+  padding-top: 6px;
+}
+.ladder-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.ladder-legend i { width: 14px; height: 3px; border-radius: 2px; display: block; }
+
+/* ===========================================================================
    Call activity
    ========================================================================== */
 .callrow {

@@ -193,6 +193,66 @@ class SwitchPoll(Base):
     )
 
 
+class CallRecord(Base):
+    """One CDR leg. All legs sharing (call_mgr_id, call_id) form one call for the
+    cradle-to-grave view. Leg identifiers correlate CMR quality to each leg."""
+
+    __tablename__ = "call_records"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    call_mgr_id: Mapped[int] = mapped_column(Integer, index=True)
+    call_id: Mapped[int] = mapped_column(Integer, index=True)
+    orig_leg_id: Mapped[int | None] = mapped_column(Integer, index=True)
+    dest_leg_id: Mapped[int | None] = mapped_column(Integer, index=True)
+
+    orig_device: Mapped[str | None] = mapped_column(String(64), index=True)
+    dest_device: Mapped[str | None] = mapped_column(String(64), index=True)
+    calling_number: Mapped[str | None] = mapped_column(String(64), index=True)
+    original_called: Mapped[str | None] = mapped_column(String(64))
+    final_called: Mapped[str | None] = mapped_column(String(64), index=True)
+    orig_ip: Mapped[str | None] = mapped_column(String(64))
+    dest_ip: Mapped[str | None] = mapped_column(String(64))
+
+    orig_time: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), index=True
+    )
+    connect_time: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    disconnect_time: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    duration: Mapped[int] = mapped_column(Integer, default=0)
+    orig_cause: Mapped[int | None] = mapped_column(Integer)
+    dest_cause: Mapped[int | None] = mapped_column(Integer)
+
+    @property
+    def call_key(self) -> str:
+        return f"{self.call_mgr_id}-{self.call_id}"
+
+    @property
+    def answered(self) -> bool:
+        return self.connect_time is not None and self.duration > 0
+
+
+class CallQuality(Base):
+    """One CMR row — call quality for a leg, correlated by leg identifier."""
+
+    __tablename__ = "call_quality"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    leg_id: Mapped[int] = mapped_column(Integer, index=True)
+    device: Mapped[str | None] = mapped_column(String(64), index=True)
+    directory_number: Mapped[str | None] = mapped_column(String(64))
+    mos: Mapped[float | None] = mapped_column(Float)
+    jitter_ms: Mapped[float | None] = mapped_column(Float)
+    latency_ms: Mapped[float | None] = mapped_column(Float)
+    packets_lost: Mapped[int | None] = mapped_column(Integer)
+    packets_sent: Mapped[int | None] = mapped_column(Integer)
+
+    @property
+    def loss_pct(self) -> float | None:
+        if self.packets_sent:
+            return round(100 * (self.packets_lost or 0) / self.packets_sent, 2)
+        return None
+
+
 class Location(Base):
     """A dispatchable location for E911. Voxa-owned data (never from CUCM)."""
 

@@ -38,6 +38,13 @@
       <a class="nav-item {{ 'on' if path == '/import' }}" href="/import">
         <span class="bar"></span>Import CSV
       </a>
+      <div class="nav-group">Telemetry</div>
+      <a class="nav-item {{ 'on' if path.startswith('/calls') }}" href="/calls">
+        <span class="bar"></span>Calls
+      </a>
+      <a class="nav-item {{ 'on' if path == '/analytics' }}" href="/analytics">
+        <span class="bar"></span>Analytics
+      </a>
       <div class="nav-group">Project</div>
       <a class="nav-item {{ 'on' if path == '/plan' }}" href="/plan">
         <span class="bar"></span>Refresh plan

@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}Calls &middot; {{ settings.app_name }}{% endblock %}
+{% block page_title %}Call search{% endblock %}
+{% block content %}
+
+<div class="card">
+  <form class="callfilter" method="get" action="/calls">
+    <label class="search">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="var(--ink-3)" aria-hidden="true"><path d="M10 2a8 8 0 1 0 4.9 14.3l5.4 5.4 1.4-1.4-5.4-5.4A8 8 0 0 0 10 2Zm0 2a6 6 0 1 1 0 12 6 6 0 0 1 0-12Z"/></svg>
+      <input type="search" name="q" value="{{ filters.q }}" placeholder="number or device (SEP…)" autocomplete="off">
+    </label>
+    <input class="filter-select" type="date" name="date_from" value="{{ filters.date_from }}" title="From date">
+    <input class="filter-select" type="date" name="date_to" value="{{ filters.date_to }}" title="To date">
+    <input class="filter-select" type="number" name="min_duration" value="{{ filters.min_duration or '' }}" placeholder="min sec" min="0" style="width:100px">
+    <select class="filter-select" name="answered">
+      <option value="" {{ 'selected' if not filters.answered }}>Any</option>
+      <option value="yes" {{ 'selected' if filters.answered == 'yes' }}>Answered</option>
+      <option value="no" {{ 'selected' if filters.answered == 'no' }}>No answer</option>
+    </select>
+    <button class="btn btn-primary" type="submit">Search</button>
+    <span class="match tnum">{{ match }} call{{ '' if match == 1 else 's' }}{% if match > results|length %} · showing {{ results|length }}{% endif %}</span>
+  </form>
+
+  <div class="scrollbox">
+    <table class="grid-table">
+      <thead>
+        <tr>
+          <th>Start</th><th>Calling</th><th>Called</th><th>Devices</th>
+          <th class="num">Duration</th><th>Result</th><th class="num">Legs</th><th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% if not results %}
+        <tr><td colspan="8" class="empty">No calls match. Ingest CDR files, or seed mock data.</td></tr>
+        {% endif %}
+        {% for c in results %}
+        <tr>
+          <td class="mono">{{ c.start.strftime("%Y-%m-%d %H:%M") if c.start else "—" }}</td>
+          <td class="mono">{{ c.calling_number or "—" }}</td>
+          <td class="mono">{{ c.final_called or "—" }}</td>
+          <td class="mono ink2">{{ c.devices | join(", ") if c.devices else "—" }}</td>
+          <td class="num tnum">{{ "%d:%02d"|format(c.duration // 60, c.duration % 60) }}</td>
+          <td>
+            {% if c.answered %}<span class="reg"><span class="dot"></span>answered</span>
+            {% else %}<span class="reg down" title="{{ cause_label(c.end_cause) }}"><span class="dot"></span>{{ cause_label(c.end_cause) | lower }}</span>{% endif %}
+          </td>
+          <td class="num tnum">{{ c.legs }}</td>
+          <td><a class="btn btn-secondary" href="/calls/{{ c.call_key }}" style="min-height:28px;padding:0 10px;font-size:12px">Trace</a></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div class="footnote">
+    <span>Cradle-to-grave: click <strong>Trace</strong> for every leg of a call, its quality, and a ladder of the flow.</span>
+  </div>
+</div>
+{% endblock %}

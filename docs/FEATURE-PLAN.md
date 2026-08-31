@@ -83,8 +83,38 @@ records — enough to answer "which phones does nobody use?".
 
 ---
 
-All six phases complete. Deliberately **not** built (they would make Voxa write
-to CUCM/phones and forfeit its read-only approval): call blocking, the policy
-engine, spam redirect, live remote control, factory reset/ITL, greeting
-injection. Raw cradle-to-grave CDR investigation is also out of scope — Voxa
-keeps call *aggregates*, not a call-record store.
+Wave 1 (Phases 1–6) complete. Deliberately **not** built (they would make Voxa
+write to CUCM/phones and forfeit its read-only approval): call blocking, the
+policy engine, spam redirect, live remote control, factory reset/ITL, greeting
+injection.
+
+---
+
+# Wave 2 — Enterprise CDR, call tracing & analytics
+
+Call Telemetry's flagship is **Call Investigation (cradle-to-grave)** with call
+traces and quality. All of this is *read-only* display of call data, so it fits
+Voxa. This wave stores raw CDR/CMR records (not just the Phase-5 aggregates).
+
+## Phase 7 — CDR record store + call search  ✅
+- ✅ `CallRecord` (one CDR leg) + `CallQuality` (one CMR) models
+- ✅ Ingest stores raw records (and still updates the Phase-5 `CallStat`)
+- ✅ Q.850 disconnect-cause labels (`app/calls.py`)
+- ✅ `/calls` search: number / device / date range / min duration / answered
+- ✅ mock_data generates ~3.6k realistic calls (legs + quality + transfers)
+
+## Phase 8 — Cradle-to-grave call detail + SIP ladder  ✅
+- ✅ `/calls/{key}` groups all legs of a call (globalCallID)
+- ✅ Cradle-to-grave leg list: participants, times, causes, per-leg quality
+- ✅ **SIP ladder diagram** (inline SVG): lifelines per party + CUCM, SETUP /
+     ANSWER / RELEASE arrows ordered in time
+- ✅ Calls linked from Phone 360
+
+## Phase 9 — Call analytics dashboard  ⬜
+- ⬜ `/analytics`: call volume over time, busy hour, top talkers
+- ⬜ Quality distribution (MOS buckets), disconnect-cause breakdown
+- ⬜ Missed-call summary (read-only, from CDR)
+
+## Phase 10 — Gateway / trunk health & CUCM insight  ⬜
+- ⬜ Gateway/trunk call volume + utilization from CDR
+- ⬜ CUCM configuration insight surface (read-only)

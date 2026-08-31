@@ -26,7 +26,15 @@ from sqlalchemy import desc, func, or_, select
 from sqlalchemy.orm import Session
 from starlette.middleware.sessions import SessionMiddleware
 
-from . import exports, history, importer, locations, report_templates, reports
+from . import (
+    calls,
+    exports,
+    history,
+    importer,
+    locations,
+    report_templates,
+    reports,
+)
 from .catalog import DEFAULT_FAMILY, FAMILIES, get_catalog
 from .auth import (
     RedirectToLogin,
@@ -79,6 +87,7 @@ def _timeago(value) -> str:
 
 
 templates.env.filters["timeago"] = _timeago
+templates.env.globals["cause_label"] = calls.cause_label
 
 settings = get_settings()
 
@@ -644,6 +653,59 @@ def report_view(
         raise HTTPException(status_code=404, detail="Unknown report")
     return templates.TemplateResponse(
         "report_view.html", _ctx(request, session, user, report=report)
+    )
+
+
+# ---------------------------------------------------------------------------
+# Calls (CDR)
+# ---------------------------------------------------------------------------
+@app.get("/calls", response_class=HTMLResponse)
+def calls_page(
+    request: Request,
+    q: str = "",
+    device: str = "",
+    date_from: str = "",
+    date_to: str = "",
+    min_duration: int = 0,
+    answered: str = "",
+    session: Session = Depends(get_session),
+    user: User = Depends(require_user),
+):
+    results, match = calls.search_calls(
+        session, q, device, date_from, date_to, min_duration, answered
+    )
+    return templates.TemplateResponse(
+        "calls.html",
+        _ctx(
+            request, session, user,
+            results=results, match=match,
+            filters={
+                "q": q, "device": device, "date_from": date_from,
+                "date_to": date_to, "min_duration": min_duration,
+                "answered": answered,
+            },
+        ),
+    )
+
+
+@app.get("/calls/{call_key}", response_class=HTMLResponse)
+def call_detail(
+    request: Request,
+    call_key: str,
+    session: Session = Depends(get_session),
+    user: User = Depends(require_user),
+):
+    legs = calls.get_call(session, call_key)
+    if not legs:
+        raise HTTPException(status_code=404, detail="Call not found")
+    quality = calls.quality_for_legs(session, legs)
+    ladder = calls.build_ladder(legs)
+    return templates.TemplateResponse(
+        "call_detail.html",
+        _ctx(
+            request, session, user,
+            call_key=call_key, legs=legs, quality=quality, ladder=ladder,
+        ),
     )
 
 

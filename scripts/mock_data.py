@@ -17,6 +17,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from app.catalog import get_catalog  # noqa: E402
 from app.db import init_db, session_scope  # noqa: E402
 from app.models import (  # noqa: E402
+    CallQuality,
+    CallRecord,
     CallStat,
     Location,
     LocationRule,
@@ -96,6 +98,8 @@ def main() -> None:
     with session_scope() as session:
         if wipe:
             session.query(PhoneSnapshot).delete()
+            session.query(CallQuality).delete()
+            session.query(CallRecord).delete()
             session.query(CallStat).delete()
             session.query(SwitchPoll).delete()
             session.query(LocationRule).delete()
@@ -183,7 +187,7 @@ def main() -> None:
 
         _seed_history(session, created_phones, now)
         _seed_locations(session)
-        _seed_call_stats(session, created_phones, now)
+        _seed_calls(session, created_phones, now)
         _seed_switch_polls(session, created_phones, now)
 
     print(f"Seeded {count} mock phones across {len(SITES)} sites.")
@@ -211,29 +215,146 @@ def _seed_switch_polls(session, phones: list[Phone], now: datetime) -> None:
         )
 
 
-def _seed_call_stats(session, phones: list[Phone], now: datetime) -> None:
-    """Give ~75% of phones call activity; the rest are 'unused' (no CallStat),
-    so the 'don't replace what nobody uses' report has something to find."""
-    for p in phones:
-        if random.random() < 0.25:
-            continue  # unused phone — no call activity
-        total = random.randint(1, 400)
-        outbound = random.randint(0, total)
-        session.add(
-            CallStat(
-                device_name=p.device_name,
-                total_calls=total,
-                outbound_calls=outbound,
-                inbound_calls=total - outbound,
-                total_seconds=total * random.randint(25, 320),
-                last_call_at=now - timedelta(
-                    days=random.randint(0, 20),
-                    minutes=random.randint(0, 1440),
-                ),
-                mos_sum=round(total * random.uniform(3.6, 4.5), 2),
-                mos_count=total,
+def _quality(leg_id: int, phone: Phone, talk: int) -> CallQuality:
+    return CallQuality(
+        leg_id=leg_id,
+        device=phone.device_name,
+        directory_number=phone.directory_number,
+        mos=round(random.uniform(3.5, 4.5), 2),
+        jitter_ms=round(random.uniform(1, 45), 1),
+        latency_ms=round(random.uniform(8, 165), 1),
+        packets_sent=int(talk * 50),
+        packets_lost=int(talk * 50 * random.uniform(0, 0.02)),
+    )
+
+
+def _bump(stats: dict, device: str, *, inbound=0, outbound=0, secs=0, when=None, mos=None):
+    s = stats.setdefault(
+        device,
+        {"total": 0, "in": 0, "out": 0, "secs": 0, "last": None,
+         "mos_sum": 0.0, "mos_count": 0},
+    )
+    s["total"] += inbound + outbound
+    s["in"] += inbound
+    s["out"] += outbound
+    s["secs"] += secs
+    if when and (s["last"] is None or when > s["last"]):
+        s["last"] = when
+    if mos is not None:
+        s["mos_sum"] += mos
+        s["mos_count"] += 1
+
+
+def _seed_calls(session, phones: list[Phone], now: datetime) -> None:
+    """Generate realistic CDR legs + CMR quality, then derive CallStat.
+
+    ~75% of registered phones make/receive calls; the rest stay unused so the
+    'retire, don't replace' report still finds them. ~12% of answered internal
+    calls get a transfer leg, so cradle-to-grave has multi-leg calls to show.
+    """
+    active = [
+        p for p in phones
+        if p.directory_number and p.registration_status == "Registered"
+        and random.random() < 0.75
+    ]
+    if len(active) < 2:
+        return
+    externals = [f"+1615{random.randint(2000000, 9999999)}" for _ in range(40)]
+    stats: dict[str, dict] = {}
+    call_id = 100000
+    leg_id = 500000
+    n_calls = len(phones) * 6
+
+    for _ in range(n_calls):
+        call_id += 1
+        caller = random.choice(active)
+        internal = random.random() < 0.78
+        if internal:
+            callee = random.choice(active)
+            if callee is caller:
+                continue
+            callee_num, callee_dev, callee_ip = (
+                callee.directory_number, callee.device_name, callee.ip_address
             )
+        else:
+            callee, callee_dev, callee_ip = None, None, None
+            callee_num = random.choice(externals)
+        cmid = 1 if caller.cluster == "cucm-east" else 2
+
+        start = now - timedelta(
+            days=random.randint(0, 14), minutes=random.randint(0, 1440),
+            seconds=random.randint(0, 59),
         )
+        answered = random.random() < 0.82
+        ring = random.randint(2, 25)
+        talk = random.randint(20, 1800) if answered else 0
+        connect = start + timedelta(seconds=ring) if answered else None
+        disconnect = (
+            connect + timedelta(seconds=talk) if answered
+            else start + timedelta(seconds=ring)
+        )
+        end_cause = 16 if answered else random.choice([17, 18, 19, 20, 21])
+        olid, dlid = leg_id, leg_id + 1
+        leg_id += 2
+
+        session.add(CallRecord(
+            call_mgr_id=cmid, call_id=call_id, orig_leg_id=olid, dest_leg_id=dlid,
+            orig_device=caller.device_name, dest_device=callee_dev,
+            calling_number=caller.directory_number,
+            original_called=callee_num, final_called=callee_num,
+            orig_ip=caller.ip_address, dest_ip=callee_ip,
+            orig_time=start, connect_time=connect, disconnect_time=disconnect,
+            duration=talk, orig_cause=16 if answered else 0, dest_cause=end_cause,
+        ))
+
+        caller_mos = None
+        if answered:
+            cq = _quality(olid, caller, talk)
+            session.add(cq)
+            caller_mos = cq.mos
+            if internal and callee is not None:
+                cq2 = _quality(dlid, callee, talk)
+                session.add(cq2)
+                _bump(stats, callee.device_name, inbound=1, secs=talk,
+                      when=start, mos=cq2.mos)
+        elif internal and callee is not None:
+            _bump(stats, callee.device_name, inbound=1, when=start)
+        _bump(stats, caller.device_name, outbound=1, secs=talk, when=start,
+              mos=caller_mos)
+
+        # Transfer: a second leg on the same call to a third party.
+        if answered and internal and callee is not None and random.random() < 0.12:
+            third = random.choice(active)
+            if third is caller or third is callee:
+                continue
+            t_start = connect + timedelta(seconds=random.randint(5, max(6, talk)))
+            t_talk = random.randint(10, 600)
+            olid2, dlid2 = leg_id, leg_id + 1
+            leg_id += 2
+            session.add(CallRecord(
+                call_mgr_id=cmid, call_id=call_id,
+                orig_leg_id=olid2, dest_leg_id=dlid2,
+                orig_device=callee.device_name, dest_device=third.device_name,
+                calling_number=callee_num,
+                original_called=third.directory_number,
+                final_called=third.directory_number,
+                orig_ip=callee_ip, dest_ip=third.ip_address,
+                orig_time=t_start, connect_time=t_start + timedelta(seconds=2),
+                disconnect_time=t_start + timedelta(seconds=t_talk),
+                duration=t_talk, orig_cause=16, dest_cause=16,
+            ))
+            cq3 = _quality(dlid2, third, t_talk)
+            session.add(cq3)
+            _bump(stats, third.device_name, inbound=1, secs=t_talk,
+                  when=t_start, mos=cq3.mos)
+
+    for device, s in stats.items():
+        session.add(CallStat(
+            device_name=device, total_calls=s["total"],
+            inbound_calls=s["in"], outbound_calls=s["out"],
+            total_seconds=s["secs"], last_call_at=s["last"],
+            mos_sum=round(s["mos_sum"], 2), mos_count=s["mos_count"],
+        ))
 
 
 SITE_ADDRESSES = {

@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% block title %}Call {{ call_key }} &middot; {{ settings.app_name }}{% endblock %}
+{% block page_title %}Call trace{% endblock %}
+{% block content %}
+
+<a class="backlink" href="/calls">&larr; Calls</a>
+
+{% set first = legs[0] %}
+{% set last = legs[-1] %}
+<div class="card detail-head">
+  <div style="min-width:0">
+    <div class="title">{{ first.calling_number or "—" }} &rarr; {{ last.final_called or last.original_called or "—" }}</div>
+    <div class="desc">Call {{ call_key }} · {{ legs|length }} leg{{ '' if legs|length == 1 else 's' }} · started {{ first.orig_time.strftime("%Y-%m-%d %H:%M:%S") if first.orig_time }}</div>
+    <div class="tags">
+      {% set answered = namespace(v=false) %}
+      {% for l in legs %}{% if l.answered %}{% set answered.v = true %}{% endif %}{% endfor %}
+      {% if answered.v %}<span class="reg"><span class="dot"></span>answered</span>
+      {% else %}<span class="reg down"><span class="dot"></span>{{ cause_label(last.dest_cause) | lower }}</span>{% endif %}
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-head">
+    <h2>Ladder</h2>
+    <span class="subhead">signalling flow, cradle to grave</span>
+  </div>
+  <div class="ladder-wrap">
+    <svg class="ladder" viewBox="0 0 {{ ladder.width }} {{ ladder.height }}" width="{{ ladder.width }}" height="{{ ladder.height }}" role="img" aria-label="Call ladder diagram">
+      <!-- lifelines -->
+      {% for p in ladder.participants %}
+      <line x1="{{ p.x }}" y1="52" x2="{{ p.x }}" y2="{{ ladder.bottom }}" stroke="var(--hairline)" stroke-width="1" {{ 'stroke-dasharray="3 4"' if not p.cucm }} />
+      <rect x="{{ p.x - 74 }}" y="10" width="148" height="36" rx="8"
+            fill="{{ 'color-mix(in srgb, var(--cyan) 14%, var(--surface-2))' if p.cucm else 'var(--surface-inset)' }}"
+            stroke="var(--hairline-soft)" />
+      <text x="{{ p.x }}" y="26" text-anchor="middle" font-size="12" font-weight="700"
+            fill="{{ 'var(--cyan)' if p.cucm else 'var(--ink-1)' }}"
+            font-family="ui-monospace, Menlo, monospace">{{ p.label[:16] }}</text>
+      <text x="{{ p.x }}" y="39" text-anchor="middle" font-size="10" fill="var(--ink-3)">{{ p.sub[:20] }}</text>
+      {% endfor %}
+      <!-- arrows -->
+      {% for a in ladder.arrows %}
+      {% set color = 'var(--blue)' if a.kind == 'setup' else 'var(--green)' if a.kind == 'answer' else 'var(--orange)' %}
+      <text x="8" y="{{ a.y + 3 }}" font-size="10" fill="var(--ink-3)" font-family="ui-monospace, Menlo, monospace">{{ a.time }}</text>
+      <line x1="{{ a.x1 }}" y1="{{ a.y }}" x2="{{ a.x2 }}" y2="{{ a.y }}" stroke="{{ color }}" stroke-width="1.5" />
+      {% if a.dir == 1 %}
+      <polygon points="{{ a.x2 }},{{ a.y }} {{ a.x2 - 9 }},{{ a.y - 4 }} {{ a.x2 - 9 }},{{ a.y + 4 }}" fill="{{ color }}" />
+      {% else %}
+      <polygon points="{{ a.x2 }},{{ a.y }} {{ a.x2 + 9 }},{{ a.y - 4 }} {{ a.x2 + 9 }},{{ a.y + 4 }}" fill="{{ color }}" />
+      {% endif %}
+      <text x="{{ a.mid }}" y="{{ a.y - 6 }}" text-anchor="middle" font-size="10.5" fill="{{ color }}" font-weight="600">{{ a.label }}</text>
+      {% endfor %}
+    </svg>
+  </div>
+  <div class="ladder-legend">
+    <span><i style="background:var(--blue)"></i>Setup</span>
+    <span><i style="background:var(--green)"></i>Answer</span>
+    <span><i style="background:var(--orange)"></i>Release</span>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-head">
+    <h2>Legs</h2>
+    <span class="subhead">every hop of the call, with quality</span>
+  </div>
+  <div class="scrollbox">
+    <table class="grid-table">
+      <thead>
+        <tr>
+          <th>#</th><th>From</th><th>To</th><th>Origination</th><th>Connect</th>
+          <th class="num">Duration</th><th>Cause</th><th class="num">MOS</th>
+          <th class="num">Jitter</th><th class="num">Latency</th><th class="num">Loss</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for l in legs %}
+        {% set oq = quality.get(l.orig_leg_id) %}
+        {% set dq = quality.get(l.dest_leg_id) %}
+        {% set best = dq or oq %}
+        <tr>
+          <td class="num">{{ loop.index }}</td>
+          <td class="mono">{{ l.calling_number or "—" }}{% if l.orig_device %}<br><span class="ink2" style="font-size:11px">{{ l.orig_device }}</span>{% endif %}</td>
+          <td class="mono">{{ l.final_called or l.original_called or "—" }}{% if l.dest_device %}<br><span class="ink2" style="font-size:11px">{{ l.dest_device }}</span>{% endif %}</td>
+          <td class="mono">{{ l.orig_time.strftime("%H:%M:%S") if l.orig_time else "—" }}</td>
+          <td class="mono">{{ l.connect_time.strftime("%H:%M:%S") if l.connect_time else "—" }}</td>
+          <td class="num tnum">{{ "%d:%02d"|format(l.duration // 60, l.duration % 60) }}</td>
+          <td class="ink2">{{ cause_label(l.dest_cause if l.dest_cause is not none else l.orig_cause) }}</td>
+          <td class="num tnum" style="color:{{ 'var(--green)' if best and best.mos and best.mos >= 4 else 'var(--orange)' if best and best.mos and best.mos >= 3.5 else 'var(--red)' if best and best.mos else 'var(--ink-3)' }}">{{ best.mos if best and best.mos else "—" }}</td>
+          <td class="num tnum ink2">{{ (best.jitter_ms ~ " ms") if best and best.jitter_ms is not none else "—" }}</td>
+          <td class="num tnum ink2">{{ (best.latency_ms ~ " ms") if best and best.latency_ms is not none else "—" }}</td>
+          <td class="num tnum ink2">{{ (best.loss_pct ~ "%") if best and best.loss_pct is not none else "—" }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% endblock %}

@@ -22,9 +22,79 @@ from pathlib import Path
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from .models import CallStat
+from .models import CallQuality, CallRecord, CallStat
 
 log = logging.getLogger(__name__)
+
+
+def _epoch(value) -> datetime | None:
+    if not value:
+        return None
+    try:
+        return datetime.fromtimestamp(int(value), tz=timezone.utc)
+    except (ValueError, OverflowError, OSError):
+        return None
+
+
+def _int(value) -> int | None:
+    try:
+        return int(float(value))
+    except (TypeError, ValueError):
+        return None
+
+
+def _cdr_record(row: dict) -> CallRecord | None:
+    mgr = _int(_pick(row, "globalcallid_callmanagerid", "globalcallidcallmanagerid"))
+    cid = _int(_pick(row, "globalcallid_callid", "globalcallidcallid"))
+    if mgr is None or cid is None:
+        return None
+    return CallRecord(
+        call_mgr_id=mgr,
+        call_id=cid,
+        orig_leg_id=_int(_pick(row, "origlegcallidentifier")),
+        dest_leg_id=_int(_pick(row, "destlegcallidentifier")),
+        orig_device=_pick(row, "origdevicename"),
+        dest_device=_pick(row, "destdevicename"),
+        calling_number=_pick(row, "callingpartynumber"),
+        original_called=_pick(row, "originalcalledpartynumber"),
+        final_called=_pick(row, "finalcalledpartynumber", "originalcalledpartynumber"),
+        orig_ip=_pick(row, "origipv4v6addr", "origipaddr"),
+        dest_ip=_pick(row, "destipv4v6addr", "destipaddr"),
+        orig_time=_epoch(_pick(row, "datetimeorigination")),
+        connect_time=_epoch(_pick(row, "datetimeconnect")),
+        disconnect_time=_epoch(_pick(row, "datetimedisconnect")),
+        duration=_int(_pick(row, "duration")) or 0,
+        orig_cause=_int(_pick(row, "origcause_value", "origcausevalue")),
+        dest_cause=_int(_pick(row, "destcause_value", "destcausevalue")),
+    )
+
+
+def _cmr_quality(row: dict) -> CallQuality | None:
+    leg = _int(_pick(row, "callidentifier"))
+    if leg is None:
+        return None
+    mos_raw = _pick(row, "mos", "mlqkav", "mlqk", "mlqkmn")
+    try:
+        mos = float(mos_raw) if mos_raw else None
+    except (TypeError, ValueError):
+        mos = None
+    return CallQuality(
+        leg_id=leg,
+        device=_pick(row, "devicename"),
+        directory_number=_pick(row, "directorynum"),
+        mos=mos if mos and mos > 0 else None,
+        jitter_ms=_float(_pick(row, "jitter")),
+        latency_ms=_float(_pick(row, "latency")),
+        packets_lost=_int(_pick(row, "numberpacketslost")),
+        packets_sent=_int(_pick(row, "numberpacketssent")),
+    )
+
+
+def _float(value) -> float | None:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
 
 
 def _pick(row: dict, *names: str):
@@ -135,7 +205,16 @@ def ingest_directory(session: Session, directory: str | Path) -> dict:
             files += 1
             is_cmr = _is_cmr(sample)
             for row in _rows(path):
-                (_fold_cmr if is_cmr else _fold_cdr)(row, agg)
+                if is_cmr:
+                    _fold_cmr(row, agg)
+                    quality = _cmr_quality(row)
+                    if quality is not None:
+                        session.add(quality)
+                else:
+                    _fold_cdr(row, agg)
+                    record = _cdr_record(row)
+                    if record is not None:
+                        session.add(record)
 
     existing = {
         c.device_name: c for c in session.scalars(select(CallStat)).all()

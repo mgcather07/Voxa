@@ -117,7 +117,9 @@
   </div>
 
   <div class="card">
-    <div class="card-head"><h2>Call activity</h2><span class="subhead">from CDR/CMR</span></div>
+    <div class="card-head"><h2>Call activity</h2><span class="subhead">from CDR/CMR</span>
+      <a class="report-title" style="margin-left:auto;font-size:12.5px" href="/calls?device={{ phone.device_name }}">View calls &rarr;</a>
+    </div>
     <div class="kv">
       {% if call_stat and call_stat.total_calls %}
       <div class="kv-row"><span class="k">Total calls</span><span class="v tnum">{{ call_stat.total_calls }}</span></div>
