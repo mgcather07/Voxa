@@ -170,7 +170,15 @@ def quality_for_legs(session: Session, legs: list[CallRecord]) -> dict[int, Call
     return {r.leg_id: r for r in rows}
 
 
-def build_ladder(legs: list[CallRecord]) -> dict | None:
+def _dur(seconds) -> str:
+    """A compact call/leg length: 8m 3s, or 45s."""
+    if not seconds:
+        return ""
+    m, s = divmod(int(seconds), 60)
+    return f"{m}m {s}s" if m else f"{s}s"
+
+
+def build_ladder(legs: list[CallRecord], device_info: dict | None = None) -> dict | None:
     """Build a SIP-style ladder (sequence diagram) of a call's signalling.
 
     Lifelines are the parties plus the CallManager they route through; arrows
@@ -183,6 +191,32 @@ def build_ladder(legs: list[CallRecord]) -> dict | None:
     mgr = legs[0].call_mgr_id
     cucm_key = f"__cucm__{mgr}"
 
+    device_info = device_info or {}
+    # Best IP per device: prefer the address recorded in the CDR leg, fall back
+    # to the phone's current registration IP from inventory.
+    cdr_ip: dict[str, str] = {}
+    for leg in legs:
+        if leg.orig_device and leg.orig_ip:
+            cdr_ip.setdefault(leg.orig_device, leg.orig_ip)
+        if leg.dest_device and leg.dest_ip:
+            cdr_ip.setdefault(leg.dest_device, leg.dest_ip)
+
+    def device_ip(dev) -> str:
+        if not dev:
+            return ""
+        return cdr_ip.get(dev) or (device_info.get(dev) or {}).get("ip") or ""
+
+    # The CallManager node these phones registered to, for the CUCM lifeline.
+    cm_node = ""
+    for leg in legs:
+        for dev in (leg.orig_device, leg.dest_device):
+            node = (device_info.get(dev) or {}).get("cm_node")
+            if node:
+                cm_node = node
+                break
+        if cm_node:
+            break
+
     order: list[str] = []
     meta: dict[str, dict] = {}
 
@@ -190,12 +224,14 @@ def build_ladder(legs: list[CallRecord]) -> dict | None:
         key = cucm_key if cucm else (device or number or "?")
         if key not in meta:
             if cucm:
-                meta[key] = {"label": f"CUCM {mgr}", "sub": "CallManager"}
+                meta[key] = {"label": f"CUCM {mgr}",
+                             "sub": cm_node or "CallManager", "ip": ""}
             else:
                 meta[key] = {
                     "label": number or device or "?",
                     "sub": device if (device and number) else
                     ("" if device else "external"),
+                    "ip": device_ip(device),
                 }
             order.append(key)
         return key
@@ -217,6 +253,8 @@ def build_ladder(legs: list[CallRecord]) -> dict | None:
             add(leg.connect_time, d, cm, "200 OK", "answer")
             add(leg.connect_time, cm, o, "200 OK", "answer")
             rel = f"BYE · {cause_label(leg.dest_cause or leg.orig_cause)}"
+            if _dur(leg.duration):
+                rel += f" · {_dur(leg.duration)}"
             add(leg.disconnect_time, o, cm, rel, "release")
             add(leg.disconnect_time, cm, d, "BYE", "release")
         else:
@@ -234,9 +272,9 @@ def build_ladder(legs: list[CallRecord]) -> dict | None:
 
     # Layout.
     left_gutter = 96
-    col_w = 168
+    col_w = 182
     x0 = left_gutter + 60
-    top = 70
+    top = 82
     row_h = 34
     xs = {key: x0 + i * col_w for i, key in enumerate(order)}
     width = x0 + (len(order) - 1) * col_w + 80
@@ -244,7 +282,7 @@ def build_ladder(legs: list[CallRecord]) -> dict | None:
 
     participants = [
         {"x": xs[key], "label": meta[key]["label"], "sub": meta[key]["sub"],
-         "cucm": key == cucm_key}
+         "ip": meta[key].get("ip", ""), "cucm": key == cucm_key}
         for key in order
     ]
     arrows = []

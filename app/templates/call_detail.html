@@ -29,14 +29,16 @@
     <svg class="ladder" viewBox="0 0 {{ ladder.width }} {{ ladder.height }}" width="{{ ladder.width }}" height="{{ ladder.height }}" role="img" aria-label="Call ladder diagram">
       <!-- lifelines -->
       {% for p in ladder.participants %}
-      <line x1="{{ p.x }}" y1="52" x2="{{ p.x }}" y2="{{ ladder.bottom }}" stroke="var(--hairline)" stroke-width="1" {{ 'stroke-dasharray="3 4"' if not p.cucm }} />
-      <rect x="{{ p.x - 74 }}" y="10" width="148" height="36" rx="8"
+      <line x1="{{ p.x }}" y1="66" x2="{{ p.x }}" y2="{{ ladder.bottom }}" stroke="var(--hairline)" stroke-width="1" {{ 'stroke-dasharray="3 4"' if not p.cucm }} />
+      <rect x="{{ p.x - 82 }}" y="8" width="164" height="54" rx="8"
             fill="{{ 'color-mix(in srgb, var(--cyan) 14%, var(--surface-2))' if p.cucm else 'var(--surface-inset)' }}"
             stroke="var(--hairline-soft)" />
-      <text x="{{ p.x }}" y="26" text-anchor="middle" font-size="12" font-weight="700"
+      <text x="{{ p.x }}" y="25" text-anchor="middle" font-size="12" font-weight="700"
             fill="{{ 'var(--cyan)' if p.cucm else 'var(--ink-1)' }}"
-            font-family="ui-monospace, Menlo, monospace">{{ p.label[:16] }}</text>
-      <text x="{{ p.x }}" y="39" text-anchor="middle" font-size="10" fill="var(--ink-3)">{{ p.sub[:20] }}</text>
+            font-family="ui-monospace, Menlo, monospace">{{ p.label[:18] }}</text>
+      <text x="{{ p.x }}" y="39" text-anchor="middle" font-size="9.5" fill="var(--ink-3)">{{ p.sub[:22] }}</text>
+      {% if p.ip %}<text x="{{ p.x }}" y="53" text-anchor="middle" font-size="9.5" fill="var(--ink-2)"
+            font-family="ui-monospace, Menlo, monospace">{{ p.ip[:24] }}</text>{% endif %}
       {% endfor %}
       <!-- arrows -->
       {% for a in ladder.arrows %}

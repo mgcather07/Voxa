@@ -1235,7 +1235,21 @@ def call_detail(
     if not legs:
         raise HTTPException(status_code=404, detail="Call not found")
     quality = calls.quality_for_legs(session, legs)
-    ladder = calls.build_ladder(legs)
+    # Enrich the ladder with each phone's registration IP and CM node from
+    # inventory (read-only DB lookup; the CDR carries a call-time IP but not the
+    # CM node the phone registered to).
+    dev_names = {
+        d for leg in legs for d in (leg.orig_device, leg.dest_device)
+        if d and d.startswith("SEP")
+    }
+    device_info: dict[str, dict] = {}
+    if dev_names:
+        for name, ip, node in session.execute(
+            select(Phone.device_name, Phone.ip_address, Phone.cm_node)
+            .where(Phone.device_name.in_(dev_names))
+        ).all():
+            device_info[name] = {"ip": ip, "cm_node": node}
+    ladder = calls.build_ladder(legs, device_info=device_info)
     return templates.TemplateResponse(
         "call_detail.html",
         _ctx(
