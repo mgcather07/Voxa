@@ -96,7 +96,9 @@ models:
   "7965": {family: "7900", generation: legacy, poe_class: 3, lifecycle: eol, replacement: "9851", verified: false}
   "7975": {family: "7900", generation: legacy, poe_class: 3, lifecycle: eol, replacement: "9851", verified: false}
   # Conference and wireless
-  "7936": {family: "conference", generation: legacy, poe_class: 3, lifecycle: eol, replacement: "8832", verified: false}
+  # 7936: pre-802.3af, external Power Cube (~15.5 W) — no native IEEE class;
+  # mapped to Class 4 so the reservation covers its real draw.
+  "7936": {family: "conference", generation: legacy, poe_class: 4, lifecycle: eol, replacement: "8832", verified: true}
   "7937": {family: "conference", generation: legacy, poe_class: 3, lifecycle: eol, replacement: "8832", verified: true}
   "7920": {family: "wireless", generation: legacy, poe_class: 0, lifecycle: eol, replacement: "8821", verified: false}
   "7921": {family: "wireless", generation: legacy, poe_class: 0, lifecycle: eol, replacement: "8821", verified: false}
@@ -106,7 +108,7 @@ models:
   # --- 6900 series --------------------------------------------------------
   "6901": {family: "6900", generation: legacy, poe_class: 1, lifecycle: eos, replacement: "9811", verified: true}
   "6911": {family: "6900", generation: legacy, poe_class: 1, lifecycle: eol, replacement: "9841", verified: false}
-  "6921": {family: "6900", generation: legacy, poe_class: 2, lifecycle: eol, replacement: "9841", verified: false}
+  "6921": {family: "6900", generation: legacy, poe_class: 2, lifecycle: eol, replacement: "9841", verified: true}
   "6941": {family: "6900", generation: legacy, poe_class: 2, lifecycle: eol, replacement: "9841", verified: false}
   "6945": {family: "6900", generation: legacy, poe_class: 2, lifecycle: eol, replacement: "9851", verified: false}
   "6961": {family: "6900", generation: legacy, poe_class: 2, lifecycle: eol, replacement: "9841", verified: false}
