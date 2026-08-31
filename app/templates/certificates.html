@@ -20,6 +20,8 @@
       {% if expired %}<span class="pill eol">{{ expired }} expired</span>{% endif %}
       {% if expiring %}<span class="pill eos">{{ expiring }} expiring &lt; 90d</span>{% endif %}
       {% if not expired and not expiring %}<span class="pill current">no expiries within 90 days</span>{% endif %}
+      {% if dns_fail %}<span class="pill unknown">{{ dns_fail }} DNS unresolved</span>{% endif %}
+      {% if no_resp %}<span class="pill eos">{{ no_resp }} no response</span>{% endif %}
       {% endif %}
     </div>
 
@@ -45,8 +47,9 @@
             <td class="device">{{ c.node or c.host }}<div class="desc" style="color:var(--ink-3)">{{ c.host }}</div></td>
             <td>{{ c.service }} <span style="color:var(--ink-3)">:{{ c.port }}</span></td>
             {% if c.error %}
-            <td colspan="4" class="desc" style="color:var(--ink-3)">{{ c.error }}</td>
-            <td><span class="pill unknown">unreachable</span></td>
+            {% set f = c.error | cert_fail %}
+            <td colspan="4" class="desc" style="color:var(--ink-3)" title="{{ c.error }}">{{ f.hint }}</td>
+            <td><span class="pill {{ f.pill }}" title="{{ c.error }}">{{ f.label }}</span></td>
             {% else %}
             <td class="desc" title="SAN: {{ c.san or 'none' }}">{{ c.subject_cn or '—' }}</td>
             <td class="desc">{{ c.issuer_cn or '—' }}</td>
@@ -70,8 +73,12 @@
       </table>
     </div>
     <div class="subhead" style="margin-top:12px">
-      Hover a subject to see its SAN. Certs not served on a socket (e.g.
-      ITLRecovery) aren't shown — they'd need the CUCM PAWS API.
+      Hover a subject for its SAN, or a failure for the raw error.
+      <strong>DNS</strong> = the node name didn't resolve (environmental — fixed
+      by internal DNS on the VM); <strong>no response / port closed</strong> = the
+      host was reached but that service isn't answering (e.g. CAPF isn't on an
+      IM&amp;P node). Certs not served on a socket (e.g. ITLRecovery) aren't shown
+      — they'd need the CUCM PAWS API.
     </div>
     {% endif %}
   </div>

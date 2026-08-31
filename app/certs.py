@@ -35,6 +35,31 @@ PORTS = [
 ]
 
 
+def classify_error(error: str | None) -> dict | None:
+    """Bucket a probe error into a UI label + pill + hint. None if no error.
+
+    The two that matter: DNS (the name never resolved — environmental, fixed by
+    internal DNS on the VM) vs a real socket outcome (reached the host, but the
+    port timed out / was refused / failed TLS)."""
+    if not error:
+        return None
+    e = error.lower()
+    if "gaierror" in e or "name or service not known" in e or "name resolution" in e:
+        return {"label": "DNS", "pill": "unknown",
+                "hint": "hostname didn't resolve — needs internal DNS (resolves on the VM)"}
+    if "timeout" in e or "timed out" in e:
+        return {"label": "no response", "pill": "eos",
+                "hint": "reached the host, but the port didn't answer (service not running, or a firewall)"}
+    if "refused" in e:
+        return {"label": "port closed", "pill": "eos",
+                "hint": "host reachable but the port is closed (service not listening)"}
+    if "reset" in e:
+        return {"label": "connection reset", "pill": "eos", "hint": error}
+    if "ssl" in e or "certificate" in e:
+        return {"label": "TLS error", "pill": "eos", "hint": error}
+    return {"label": "unreachable", "pill": "unknown", "hint": error}
+
+
 def _cn(rdn_seq) -> str | None:
     """commonName from an ssl subject/issuer RDN sequence, else organizationName."""
     fallback = None

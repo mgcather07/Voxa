@@ -172,6 +172,7 @@ def _days_until(v):   # whole days from now to a datetime; negative if past
 
 
 templates.env.filters["days_until"] = _days_until
+templates.env.filters["cert_fail"] = certs.classify_error
 
 
 def _timeago(value) -> str:
@@ -1039,11 +1040,19 @@ def certificates_page(
     valid = [c for c in cert_rows if not c.error and c.valid_to]
     expired = sum(1 for c in valid if c.valid_to < now)
     expiring = sum(1 for c in valid if 0 <= (c.valid_to - now).days < 90)
+    dns_fail = sum(
+        1 for c in cert_rows
+        if (certs.classify_error(c.error) or {}).get("label") == "DNS"
+    )
+    no_resp = sum(
+        1 for c in cert_rows
+        if c.error and (certs.classify_error(c.error) or {}).get("label") != "DNS"
+    )
     last = max((c.checked_at for c in cert_rows), default=None)
     return templates.TemplateResponse(
         "certificates.html",
         _ctx(request, session, user, certs=cert_rows, last_checked=last,
-             expired=expired, expiring=expiring),
+             expired=expired, expiring=expiring, dns_fail=dns_fail, no_resp=no_resp),
     )
 
 
