@@ -123,3 +123,19 @@ Voxa. This wave stores raw CDR/CMR records (not just the Phase-5 aggregates).
 ## Phase 11 — CDR reports  ✅
 Plugged into the Phase-4 reports engine (CSV / XLSX / print for free).
 - ✅ Missed calls · Poor-quality calls · Top talkers · Gateways & trunks
+
+---
+
+# Wave 3 — Capacity & integration
+
+## Phase 12 — Concurrency / capacity  ✅
+- ✅ Sweep-line concurrency over CDR intervals → peak concurrent + time series
+- ✅ Per-gateway peak concurrency, Erlangs, BHCA (`app/capacity.py`)
+- ✅ `TrunkCapacity` (editable channels per trunk) → utilization %
+- ✅ `/capacity` page (concurrency chart + per-trunk table)
+
+## Phase 13 — Read API + opt-in webhooks  ⬜
+- ⬜ `GET /api/v1/...` JSON (phones, calls, analytics) behind a bearer token
+- ⬜ `ApiToken` model + management
+- ⬜ Opt-in outbound webhooks (disabled by default): `Webhook` config, HMAC
+     signing, events from sync/ingest (phones.changed, call.quality_alert)

@@ -174,6 +174,20 @@ class CallStat(Base):
         return round(self.total_seconds / 60)
 
 
+class TrunkCapacity(Base):
+    """Channel count for a PSTN gateway / SIP trunk, so concurrency can be shown
+    as a utilization %. Operator-set (Voxa-owned)."""
+
+    __tablename__ = "trunk_capacity"
+    __table_args__ = (
+        UniqueConstraint("gateway_name", name="uq_trunk_capacity_gateway"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    gateway_name: Mapped[str] = mapped_column(String(128), index=True)
+    channels: Mapped[int] = mapped_column(Integer, default=0)
+
+
 class SwitchPoll(Base):
     """Real PoE numbers polled from an access switch via SNMP, to compare with
     the class-ceiling estimate: what the switch actually draws now, and its total

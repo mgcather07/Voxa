@@ -26,6 +26,7 @@ from app.models import (  # noqa: E402
     PhoneSnapshot,
     SwitchPoll,
     SyncRun,
+    TrunkCapacity,
 )
 
 # How many historical collection runs to fabricate, so change history and the
@@ -108,6 +109,7 @@ def main() -> None:
             session.query(CallQuality).delete()
             session.query(CallRecord).delete()
             session.query(CallStat).delete()
+            session.query(TrunkCapacity).delete()
             session.query(SwitchPoll).delete()
             session.query(LocationRule).delete()
             session.query(Location).delete()
@@ -196,6 +198,9 @@ def main() -> None:
         _seed_locations(session)
         _seed_calls(session, created_phones, now)
         _seed_switch_polls(session, created_phones, now)
+        for gw, chans in [("HQ-PSTN-GW", 23), ("HQ-SIP-TRUNK", 120),
+                          ("PLANT-PSTN-GW", 23)]:
+            session.add(TrunkCapacity(gateway_name=gw, channels=chans))
 
     print(f"Seeded {count} mock phones across {len(SITES)} sites.")
 

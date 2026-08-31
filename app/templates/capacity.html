@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block title %}Capacity &middot; {{ settings.app_name }}{% endblock %}
+{% block page_title %}Concurrency &amp; capacity{% endblock %}
+{% block content %}
+
+{% if not cap.has_data %}
+  <div class="card"><div class="empty">
+    <h2>No call data yet</h2>
+    <p>Concurrency is computed from CDR call intervals. Ingest CDR files or seed
+      mock data with <code>python scripts/mock_data.py</code>.</p>
+  </div></div>
+{% else %}
+
+<div class="section">
+  <div class="tiles">
+    <div class="tile"><div class="label">Peak concurrent</div>
+      <div class="value-row"><span class="value tnum" style="color:var(--cyan)">{{ cap.peak }}</span><span class="unit">calls</span></div>
+      <div class="note">{{ cap.peak_at.strftime("%Y-%m-%d %H:%M") if cap.peak_at else "" }}</div></div>
+    <div class="tile"><div class="label">Traffic</div>
+      <div class="value-row"><span class="value tnum">{{ cap.erlangs }}</span><span class="unit">Erlangs</span></div>
+      <div class="note">avg simultaneous calls over the range</div></div>
+    <div class="tile"><div class="label">Busy-hour call attempts</div>
+      <div class="value-row"><span class="value tnum">{{ cap.bhca }}</span></div>
+      <div class="note">most calls started in any 60 min</div></div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h2>Concurrent calls over time</h2><span class="subhead">peak simultaneous calls per interval</span></div>
+    <div class="trend" style="height:150px">
+      {% for b in cap.series %}
+      <div class="trend-col" title="{{ b.peak }} concurrent · {{ b.start.strftime('%m/%d %H:%M') }}">
+        <div class="trend-bar" style="border-radius:3px 3px 0 0">
+          <div class="fill" style="height:{{ (100 * b.peak / cap.series_max) | round | int }}%;background:linear-gradient(180deg,var(--cyan),var(--blue))"></div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    <div class="trend-legend"><span>Range peak: <b class="tnum">{{ cap.peak }}</b> concurrent calls</span></div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h2>Trunk capacity</h2><span class="subhead">set channels per trunk to see utilization</span></div>
+    <div class="scrollbox">
+      <table class="grid-table">
+        <thead>
+          <tr><th>Gateway / trunk</th><th class="num">Peak concurrent</th><th class="num">Erlangs</th><th class="num">Minutes</th><th>Channels</th><th style="width:200px">Utilization</th></tr>
+        </thead>
+        <tbody>
+          {% for g in cap.gateways %}
+          <tr>
+            <td class="device">{{ g.name }}</td>
+            <td class="num tnum">{{ g.peak }}</td>
+            <td class="num tnum">{{ g.erlangs }}</td>
+            <td class="num tnum">{{ g.minutes }}</td>
+            <td>
+              <form method="post" action="/capacity/channels" style="display:flex;gap:6px;align-items:center">
+                <input type="hidden" name="gateway" value="{{ g.name }}">
+                <input class="filter-select" style="width:74px;padding:5px 8px" type="number" name="channels" value="{{ g.channels or '' }}" min="0" placeholder="—">
+                <button class="linkbtn" type="submit" title="Save">save</button>
+              </form>
+            </td>
+            <td>
+              {% if g.util is not none %}
+              <div class="growth">
+                <div class="track"><span class="{{ 'g-high' if g.util > 85 else 'g-mid' if g.util > 60 else 'g-low' }}" style="width:{{ [g.util, 100] | min }}%"></span></div>
+                <span class="pct">{{ g.util }}%</span>
+              </div>
+              {% else %}<span class="muted" style="font-size:12px">set channels</span>{% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="footnote"><span>Peak concurrent vs channels is the number that tells you whether a trunk is running out. Erlangs is average simultaneous load.</span></div>
+  </div>
+</div>
+
+{% endif %}
+{% endblock %}

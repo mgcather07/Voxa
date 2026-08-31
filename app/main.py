@@ -29,6 +29,7 @@ from starlette.middleware.sessions import SessionMiddleware
 from . import (
     analytics,
     calls,
+    capacity,
     exports,
     history,
     importer,
@@ -54,6 +55,7 @@ from .models import (
     LocationRule,
     Phone,
     SyncRun,
+    TrunkCapacity,
     User,
 )
 from .models import utcnow
@@ -698,6 +700,36 @@ def analytics_page(
     return templates.TemplateResponse(
         "analytics.html", _ctx(request, session, user, a=analytics.overview(session))
     )
+
+
+@app.get("/capacity", response_class=HTMLResponse)
+def capacity_page(
+    request: Request,
+    session: Session = Depends(get_session),
+    user: User = Depends(require_user),
+):
+    return templates.TemplateResponse(
+        "capacity.html", _ctx(request, session, user, cap=capacity.overview(session))
+    )
+
+
+@app.post("/capacity/channels")
+def capacity_set_channels(
+    gateway: str = Form(...),
+    channels: int = Form(0),
+    session: Session = Depends(get_session),
+    user: User = Depends(require_user),
+):
+    row = session.scalars(
+        select(TrunkCapacity).where(TrunkCapacity.gateway_name == gateway)
+    ).first()
+    if row is None:
+        row = TrunkCapacity(gateway_name=gateway, channels=max(0, channels))
+        session.add(row)
+    else:
+        row.channels = max(0, channels)
+    session.commit()
+    return RedirectResponse(url="/capacity", status_code=303)
 
 
 @app.get("/calls/{call_key}", response_class=HTMLResponse)
