@@ -1,0 +1,54 @@
+# Containerized LOCAL DEV stack — Postgres + the app, with live reload.
+#
+#   make dev-up      # build + start on http://localhost:8000
+#   make dev-seed    # load 600 mock phones (first run)
+#
+# The source is bind-mounted over the image's baked copy and uvicorn runs with
+# --reload, so editing files on the host hot-reloads the running container:
+# Python changes restart the worker, template/CSS changes show on the next
+# refresh. No rebuild needed unless requirements.txt changes (then: make dev-up
+# rebuilds). This is NOT the production stack — see docker-compose.prod.yml.
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: voxa
+      POSTGRES_PASSWORD: voxa
+      POSTGRES_DB: voxa
+    ports:
+      - "5433:5432"      # host 5433 so it never fights a local Postgres
+    volumes:
+      - pgdata_dev:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U voxa -d voxa"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build: .
+    command: ["uvicorn", "app.main:app",
+              "--host", "0.0.0.0", "--port", "8000", "--reload"]
+    environment:
+      DATABASE_URL: postgresql+psycopg://voxa:voxa@db:5432/voxa
+      AUTH_DISABLED: "true"       # local only — skip login
+      MOCK_MODE: "true"           # never call a real CUCM from a dev box
+      SECRET_KEY: dev-only-insecure
+      APP_NAME: Voxa
+      # Colima's virtiofs mount doesn't deliver inotify events, so uvicorn's
+      # --reload must poll for changes or .py edits won't restart the worker.
+      WATCHFILES_FORCE_POLLING: "true"
+    volumes:
+      # Live source — edits on the host reflect in the container immediately.
+      - ./app:/srv/app/app
+      - ./config:/srv/app/config
+      - ./scripts:/srv/app/scripts
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  pgdata_dev:

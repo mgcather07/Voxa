@@ -1,4 +1,5 @@
 .PHONY: help install dev mock user check \
+        dev-up dev-seed dev-logs dev-down dev-reset \
         image image-save image-load image-push bundle release \
         up down logs backup restore shell create-user
 
@@ -32,6 +33,13 @@ help:
 	@echo "  make mock       seed 600 fake phones (no CUCM needed)"
 	@echo "  make user       create an admin account"
 	@echo "  make check      test CUCM connectivity and permissions"
+	@echo ""
+	@echo "Containerized local dev (Docker on this machine, live reload)"
+	@echo "  make dev-up      build + start the dev stack on :8000"
+	@echo "  make dev-seed    load 600 mock phones (first run)"
+	@echo "  make dev-logs    follow the app container logs"
+	@echo "  make dev-down    stop the dev stack"
+	@echo "  make dev-reset   stop and wipe the dev database"
 	@echo ""
 	@echo "Release (tag a version; GitHub Actions builds & publishes it)"
 	@echo "  make release VERSION=1.0.0   tag v1.0.0 and push it"
@@ -70,6 +78,26 @@ user:
 
 check:
 	python scripts/test_cucm.py
+
+# --- Containerized local dev (Docker on this machine) -----------------------
+DEV := docker compose -f docker-compose.dev.yml
+
+dev-up:
+	$(DEV) up -d --build
+	@echo "App starting on http://localhost:8000"
+	@echo "First run? Load sample data with: make dev-seed"
+
+dev-seed:
+	$(DEV) exec app python scripts/mock_data.py 600 --wipe
+
+dev-logs:
+	$(DEV) logs -f app
+
+dev-down:
+	$(DEV) down
+
+dev-reset:
+	$(DEV) down -v
 
 # --- Release ----------------------------------------------------------------
 # Tag a version and push it; the GitHub Actions `release` workflow builds and
