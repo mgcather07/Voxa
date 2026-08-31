@@ -7,8 +7,9 @@ from dataclasses import dataclass, field
 from sqlalchemy import case, func, select
 from sqlalchemy.orm import Session
 
+from . import mos as mos_lib
 from .catalog import DEFAULT_FAMILY, get_catalog
-from .models import CallStat, ClusterNode, Phone, SwitchPoll
+from .models import CallQuality, CallStat, ClusterNode, Phone, SwitchPoll
 
 # Show the imbalance banner once the busiest node passes this share of the
 # cluster's live registrations.
@@ -351,6 +352,74 @@ def call_activity(session: Session) -> dict:
         "total_phones": total_phones,
         "unused_pct": round(100 * unused / total_phones) if total_phones else 0,
         "avg_mos": round(mos_sum / mos_count, 2) if mos_count else None,
+    }
+
+
+def mos_stats(session: Session) -> dict:
+    """Call-quality statistics from real CMR measurements (CallQuality.mos).
+
+    Every band count, average and min/max is derived from actual measured legs;
+    a call leg with no MOS is excluded, never counted as 0. Classification runs
+    through :mod:`app.mos` so it matches every other page. ``sample`` is the
+    number of measured legs the whole picture rests on — surfaced in the UI so
+    an engineer knows how much data the score represents.
+    """
+    values = [
+        m for (m,) in session.execute(
+            select(CallQuality.mos).where(CallQuality.mos.is_not(None))
+        ).all()
+    ]
+    sample = len(values)
+    if not sample:
+        return {"has_mos": False, "sample": 0}
+
+    average = round(sum(values) / sample, 2)
+    below_a = sum(1 for m in values if m < mos_lib.BELOW_A)
+    below_b = sum(1 for m in values if m < mos_lib.BELOW_B)
+    problem = sum(1 for m in values if m < mos_lib.PROBLEM_MAX)
+
+    counts = {b.key: 0 for b in mos_lib.BANDS}
+    for m in values:
+        counts[mos_lib.band_for(m).key] += 1
+
+    distribution = [
+        {
+            "key": b.key,
+            "label": b.label,
+            "color": b.color,
+            "range": b.range_text,
+            "count": counts[b.key],
+            "pct": round(100 * counts[b.key] / sample, 1),
+        }
+        for b in mos_lib.BANDS_DESC
+    ]
+
+    def pct(n: int) -> float:
+        return round(100 * n / sample, 1)
+
+    return {
+        "has_mos": True,
+        "sample": sample,
+        "average": average,
+        "average_rating": mos_lib.rating(average),
+        "minimum": round(min(values), 2),
+        "minimum_rating": mos_lib.rating(min(values)),
+        "maximum": round(max(values), 2),
+        "maximum_rating": mos_lib.rating(max(values)),
+        "below_a": below_a,
+        "below_a_pct": pct(below_a),
+        "below_a_label": f"{mos_lib.BELOW_A:.1f}",
+        "below_b": below_b,
+        "below_b_pct": pct(below_b),
+        "below_b_label": f"{mos_lib.BELOW_B:.1f}",
+        "problem": problem,
+        "problem_pct": pct(problem),
+        "excellent": counts["excellent"],
+        "good": counts["good"],
+        "fair": counts["fair"],
+        "poor": counts["poor"],
+        "bad": counts["bad"],
+        "distribution": distribution,
     }
 
 

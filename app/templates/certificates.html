@@ -3,13 +3,63 @@
 {% block page_title %}Certificates{% endblock %}
 {% block content %}
 
+{% macro cert_row(c) %}
+<tr>
+  <td class="device">{{ c.node or c.host }}<div class="desc" style="color:var(--ink-3)">{{ c.host }}</div></td>
+  <td>{{ c.service }} <span style="color:var(--ink-3)">:{{ c.port }}</span></td>
+  {% if c.error %}
+  {% set f = c.error | cert_fail %}
+  <td colspan="4" class="desc" style="color:var(--ink-3)" title="{{ c.error }}">{{ f.hint }}</td>
+  <td><span class="pill {{ f.pill }}" title="{{ c.error }}">{{ f.label }}</span></td>
+  {% else %}
+  <td class="desc" title="SAN: {{ c.san or 'none' }}">{{ c.subject_cn or '—' }}</td>
+  <td class="desc">{{ c.issuer_cn or '—' }}</td>
+  <td>
+    {% if c.self_signed %}<span class="pill eos">self-signed</span>
+    {% else %}<span class="pill current">CA-signed</span>{% endif %}
+  </td>
+  {% set d = c.valid_to | days_until %}
+  <td class="tnum">{{ c.valid_to | fdate }}{% if d is not none %} <span style="color:var(--ink-3)">({{ d }}d)</span>{% endif %}</td>
+  <td>
+    {% if d is none %}<span class="pill unknown">unknown</span>
+    {% elif d < 0 %}<span class="pill eol">expired</span>
+    {% elif d < 30 %}<span class="pill eol">{{ d }}d left</span>
+    {% elif d < 90 %}<span class="pill eos">{{ d }}d left</span>
+    {% else %}<span class="pill current">valid</span>{% endif %}
+  </td>
+  {% endif %}
+</tr>
+{% endmacro %}
+
+{% macro cert_table(title, sub, rows) %}
+{% if rows %}
+<div class="cert-section">
+  <span class="cert-section-t">{{ title }}</span>
+  <span class="cert-section-s">{{ sub }}</span>
+</div>
+<div style="overflow-x:auto">
+  <table class="grid-table">
+    <thead>
+      <tr>
+        <th>Host</th><th>Service</th><th>Subject (CN)</th><th>Issuer</th>
+        <th>Type</th><th>Expires</th><th>Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for c in rows %}{{ cert_row(c) }}{% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+{% endmacro %}
+
 <div class="section">
   <div class="card pad-lg">
     <div class="card-head">
-      <h2>Node certificates</h2>
-      <span class="subhead">TLS certificates each CUCM node serves (8443 Tomcat,
-        5061 CallManager, 2443 CAPF), read with a plain handshake — read-only, no
-        CUCM API.{% if last_checked %} Last checked {{ last_checked | fdt }}.{% endif %}</span>
+      <h2>Node &amp; border certificates</h2>
+      <span class="subhead">TLS certificates each CUCM node (8443 Tomcat, 5061
+        CallManager, 2443 CAPF) and each CUBE / SBC serves, read with a plain
+        handshake — read-only, no CUCM API.{% if last_checked %} Last checked {{ last_checked | fdt }}.{% endif %}</span>
     </div>
 
     <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:14px">
@@ -28,59 +78,71 @@
     {% if not certs %}
     <div class="empty">
       <h2>No certificates checked yet</h2>
-      <p>Click <strong>Check certificates</strong>. Voxa opens a TLS socket to
-        each node's certificate ports and reads what it serves — nothing is
-        written to CUCM. Nodes it can't route to over the VPN show as unreachable.</p>
+      <p>Add any CUBEs below, then click <strong>Check certificates</strong>. Voxa
+        opens a TLS socket to each CUCM node and CUBE and reads what it serves —
+        nothing is written. Hosts it can't route to over the VPN show as unreachable.</p>
     </div>
     {% else %}
+    {{ cert_table("CUCM nodes", "publisher, subscribers, IM&P — discovered from the cluster", cucm_certs) }}
+    {{ cert_table("CUBEs / border elements", "operator-added SIP border elements and gateways", cube_certs) }}
+    <div class="subhead" style="margin-top:12px">
+      Hover a subject for its SAN, or a failure for the raw error.
+      <strong>DNS</strong> = the host name didn't resolve (environmental — fixed
+      by internal DNS on the VM); <strong>no response / port closed</strong> = the
+      host was reached but that service isn't answering (e.g. CAPF isn't on an
+      IM&amp;P node, or a CUBE without an HTTPS management interface on 8443).
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="card pad-lg">
+    <div class="card-head">
+      <h2>CUBEs &amp; border elements</h2>
+      <span class="subhead">TLS endpoints to include in the check. CUCM nodes are
+        found automatically; add CUBEs / SBCs here since they aren't in CUCM.</span>
+    </div>
+
+    {% if cert_targets %}
     <div style="overflow-x:auto">
       <table class="grid-table">
         <thead>
-          <tr>
-            <th>Node</th><th>Service</th><th>Subject (CN)</th><th>Issuer</th>
-            <th>Type</th><th>Expires</th><th>Status</th>
-          </tr>
+          <tr><th>Host</th><th>Label</th><th>Ports</th><th></th></tr>
         </thead>
         <tbody>
-          {% for c in certs %}
+          {% for t in cert_targets %}
           <tr>
-            <td class="device">{{ c.node or c.host }}<div class="desc" style="color:var(--ink-3)">{{ c.host }}</div></td>
-            <td>{{ c.service }} <span style="color:var(--ink-3)">:{{ c.port }}</span></td>
-            {% if c.error %}
-            {% set f = c.error | cert_fail %}
-            <td colspan="4" class="desc" style="color:var(--ink-3)" title="{{ c.error }}">{{ f.hint }}</td>
-            <td><span class="pill {{ f.pill }}" title="{{ c.error }}">{{ f.label }}</span></td>
-            {% else %}
-            <td class="desc" title="SAN: {{ c.san or 'none' }}">{{ c.subject_cn or '—' }}</td>
-            <td class="desc">{{ c.issuer_cn or '—' }}</td>
-            <td>
-              {% if c.self_signed %}<span class="pill eos">self-signed</span>
-              {% else %}<span class="pill current">CA-signed</span>{% endif %}
+            <td class="mono">{{ t.host }}</td>
+            <td>{{ t.label or "—" }}</td>
+            <td class="mono">{{ t.ports }}</td>
+            <td style="text-align:right">
+              <form method="post" action="/certificates/targets/{{ t.id }}/delete" style="display:inline">
+                <button class="btn btn-secondary" type="submit"
+                        style="min-height:28px;padding:0 10px;font-size:12px">Remove</button>
+              </form>
             </td>
-            {% set d = c.valid_to | days_until %}
-            <td class="tnum">{{ c.valid_to | fdate }}{% if d is not none %} <span style="color:var(--ink-3)">({{ d }}d)</span>{% endif %}</td>
-            <td>
-              {% if d is none %}<span class="pill unknown">unknown</span>
-              {% elif d < 0 %}<span class="pill eol">expired</span>
-              {% elif d < 30 %}<span class="pill eol">{{ d }}d left</span>
-              {% elif d < 90 %}<span class="pill eos">{{ d }}d left</span>
-              {% else %}<span class="pill current">valid</span>{% endif %}
-            </td>
-            {% endif %}
           </tr>
           {% endfor %}
         </tbody>
       </table>
     </div>
-    <div class="subhead" style="margin-top:12px">
-      Hover a subject for its SAN, or a failure for the raw error.
-      <strong>DNS</strong> = the node name didn't resolve (environmental — fixed
-      by internal DNS on the VM); <strong>no response / port closed</strong> = the
-      host was reached but that service isn't answering (e.g. CAPF isn't on an
-      IM&amp;P node). Certs not served on a socket (e.g. ITLRecovery) aren't shown
-      — they'd need the CUCM PAWS API.
-    </div>
+    {% else %}
+    <div class="subhead" style="margin-bottom:12px">No CUBEs added yet.</div>
     {% endif %}
+
+    <form method="post" action="/certificates/targets" class="cube-add">
+      <input class="filter-select" type="text" name="host" required
+             placeholder="cube1.corp.example.com or 10.0.20.5" style="min-width:260px">
+      <input class="filter-select" type="text" name="label"
+             placeholder="Label — e.g. HQ CUBE" style="min-width:180px">
+      <input class="filter-select" type="text" name="ports" value="5061,8443"
+             title="Comma-separated TLS ports" style="width:120px">
+      <button class="btn btn-primary" type="submit">Add CUBE</button>
+    </form>
+    <div class="subhead" style="margin-top:10px">
+      <strong>5061</strong> is the SIP-TLS cert on a secure trunk (its expiry
+      drops the trunk); <strong>8443</strong> is the IOS-XE HTTPS management /
+      RESTCONF cert. Edit ports per CUBE — re-adding the same host updates it.
+    </div>
   </div>
 </div>
 

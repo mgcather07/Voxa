@@ -1,0 +1,36 @@
+{# Shared MOS presentation. All colour comes from the rating object (app.mos),
+   never hardcoded here, so every page stays in lockstep with the classifier. #}
+
+{# A score + quality-label chip. `r` is a MosRating (value | mos_rating). #}
+{% macro pill(r, size="") %}
+  {% if r.has_score %}
+  <span class="mos-pill {{ size }}"
+        style="color:{{ r.color }};
+               background:color-mix(in srgb, {{ r.color }} 14%, transparent);
+               border-color:color-mix(in srgb, {{ r.color }} 34%, transparent)"
+        title="{{ r.label }} · MOS {{ r.range }}">
+    <b class="tnum">{{ '%.2f'|format(r.score) }}</b><i>{{ r.label|upper }}</i>
+  </span>
+  {% else %}
+  <span class="mos-pill none" title="No MOS measured for this call">—</span>
+  {% endif %}
+{% endmacro %}
+
+{# The 1.0–5.0 quality scale with the score marked in position. #}
+{% macro scale(r) %}
+<div class="mos-scale">
+  <div class="mos-scale-bar">
+    {% for b in mos_bands %}
+    <span class="mos-seg" style="width:{{ b.width_pct }}%;background:{{ b.color }}"></span>
+    {% endfor %}
+    {% if r.has_score %}
+    <span class="mos-marker" style="left:{{ r.pct }}%" title="MOS {{ '%.2f'|format(r.score) }} — {{ r.label }}"></span>
+    {% endif %}
+  </div>
+  <div class="mos-scale-legend">
+    {% for b in mos_bands %}
+    <span><i style="background:{{ b.color }}"></i>{{ b.label }}</span>
+    {% endfor %}
+  </div>
+</div>
+{% endmacro %}

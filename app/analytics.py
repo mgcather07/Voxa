@@ -14,6 +14,7 @@ from datetime import timedelta
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from . import mos as mos_lib
 from .calls import cause_label
 from .models import CallQuality, CallRecord, utcnow
 
@@ -41,7 +42,7 @@ def quality_issues(session: Session, limit: int = 12) -> list[dict]:
     """Worst-MOS legs, each linked back to its call for a one-click trace."""
     bad = session.execute(
         select(CallQuality).where(CallQuality.mos.is_not(None),
-                                  CallQuality.mos < 3.6)
+                                  CallQuality.mos < mos_lib.PROBLEM_MAX)
         .order_by(CallQuality.mos.asc()).limit(limit)
     ).scalars().all()
     out = []
@@ -113,26 +114,20 @@ def overview(session: Session) -> dict:
             select(CallQuality.mos).where(CallQuality.mos.is_not(None))
         ).all()
     ]
-    buckets = [
-        ("Excellent", "≥ 4.3", "var(--green)", 0),
-        ("Good", "4.0–4.3", "var(--mint)", 0),
-        ("Fair", "3.6–4.0", "var(--orange)", 0),
-        ("Poor", "< 3.6", "var(--red)", 0),
-    ]
-    counts = [0, 0, 0, 0]
+    # Distribution across the five shared MOS bands (best → worst).
+    band_counts = {b.key: 0 for b in mos_lib.BANDS}
     for m in mos_values:
-        if m >= 4.3:
-            counts[0] += 1
-        elif m >= 4.0:
-            counts[1] += 1
-        elif m >= 3.6:
-            counts[2] += 1
-        else:
-            counts[3] += 1
+        band_counts[mos_lib.band_for(m).key] += 1
     quality = [
-        {"label": b[0], "range": b[1], "color": b[2], "count": counts[i]}
-        for i, b in enumerate(buckets)
+        {
+            "label": b.label,
+            "range": b.range_text,
+            "color": b.color,
+            "count": band_counts[b.key],
+        }
+        for b in mos_lib.BANDS_DESC
     ]
+    counts = list(band_counts.values())
     avg_mos = round(sum(mos_values) / len(mos_values), 2) if mos_values else None
 
     return {

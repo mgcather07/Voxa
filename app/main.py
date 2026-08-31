@@ -38,6 +38,7 @@ from . import (
     history,
     importer,
     locations,
+    mos,
     report_templates,
     reports,
     settings_store,
@@ -62,6 +63,7 @@ from .models import (
     CallStat,
     CatalogOverride,
     Certificate,
+    CertTarget,
     Cluster,
     ClusterNode,
     ClusterTestLog,
@@ -182,6 +184,14 @@ def _days_until(v):   # whole days from now to a datetime; negative if past
 
 templates.env.filters["days_until"] = _days_until
 templates.env.filters["cert_fail"] = certs.classify_error
+
+# MOS classification — every page renders quality through the one helper.
+templates.env.filters["mos_rating"] = mos.rating
+templates.env.globals["mos_bands"] = mos.BANDS          # worst→best (scale order)
+templates.env.globals["mos_bands_desc"] = mos.BANDS_DESC  # best→worst (filters)
+templates.env.globals["mos_metric_health"] = mos.metric_health
+templates.env.globals["mos_likely_issue"] = mos.likely_issue
+templates.env.globals["mos_problem_max"] = mos.PROBLEM_MAX
 
 
 def _timeago(value) -> str:
@@ -339,6 +349,7 @@ def dashboard(
             sites=reports.by_site(session),
             unverified=reports.unverified_models(session),
             call_activity=reports.call_activity(session),
+            mos_stats=reports.mos_stats(session),
             clusters=reports.clusters(session),
             topology=reports.cluster_topology(session),
         ),
@@ -1043,6 +1054,13 @@ def certificates_page(
     cert_rows = session.scalars(
         select(Certificate).order_by(Certificate.host, Certificate.port)
     ).all()
+    cert_targets = session.scalars(
+        select(CertTarget).order_by(CertTarget.host)
+    ).all()
+    cube_hosts = {t.host for t in cert_targets}
+    # Split the results so CUCM nodes and CUBEs / SBCs each get their own table.
+    cube_certs = [c for c in cert_rows if c.host in cube_hosts]
+    cucm_certs = [c for c in cert_rows if c.host not in cube_hosts]
     now = utcnow()
     valid = [c for c in cert_rows if not c.error and c.valid_to]
     expired = sum(1 for c in valid if c.valid_to < now)
@@ -1058,9 +1076,52 @@ def certificates_page(
     last = max((c.checked_at for c in cert_rows), default=None)
     return templates.TemplateResponse(
         "certificates.html",
-        _ctx(request, session, user, certs=cert_rows, last_checked=last,
+        _ctx(request, session, user, certs=cert_rows,
+             cucm_certs=cucm_certs, cube_certs=cube_certs,
+             cert_targets=cert_targets, last_checked=last,
              expired=expired, expiring=expiring, dns_fail=dns_fail, no_resp=no_resp),
     )
+
+
+@app.post("/certificates/targets")
+def certificates_add_target(
+    host: str = Form(...),
+    label: str = Form(""),
+    ports: str = Form("5061,8443"),
+    session: Session = Depends(get_session),
+    user: User = Depends(require_admin),
+):
+    host = (host or "").strip()
+    if host:
+        existing = session.scalars(
+            select(CertTarget).where(CertTarget.host == host)
+        ).first()
+        if existing is None:
+            session.add(CertTarget(
+                host=host, label=(label or "").strip() or None,
+                kind="cube", ports=(ports or "").strip() or "5061,8443",
+            ))
+        else:  # editing an existing CUBE in place
+            existing.label = (label or "").strip() or None
+            existing.ports = (ports or "").strip() or "5061,8443"
+            existing.enabled = True
+        session.commit()
+        log.info("Cert target added/updated by %s: %s", user.username, host)
+    return RedirectResponse(url="/certificates", status_code=303)
+
+
+@app.post("/certificates/targets/{target_id}/delete")
+def certificates_delete_target(
+    target_id: int,
+    session: Session = Depends(get_session),
+    user: User = Depends(require_admin),
+):
+    t = session.get(CertTarget, target_id)
+    if t:
+        session.delete(t)
+        session.commit()
+        log.info("Cert target removed by %s: %s", user.username, t.host)
+    return RedirectResponse(url="/certificates", status_code=303)
 
 
 @app.post("/certificates/check")
@@ -1226,11 +1287,14 @@ def calls_page(
     date_to: str = "",
     min_duration: int = 0,
     answered: str = "",
+    mos_band: str = "",
+    sort: str = "",
     session: Session = Depends(get_session),
     user: User = Depends(require_user),
 ):
     results, match = calls.search_calls(
-        session, q, device, date_from, date_to, min_duration, answered
+        session, q, device, date_from, date_to, min_duration, answered,
+        mos_band=mos_band, sort=sort,
     )
     return templates.TemplateResponse(
         "calls.html",
@@ -1240,7 +1304,7 @@ def calls_page(
             filters={
                 "q": q, "device": device, "date_from": date_from,
                 "date_to": date_to, "min_duration": min_duration,
-                "answered": answered,
+                "answered": answered, "mos_band": mos_band, "sort": sort,
             },
         ),
     )
@@ -1319,11 +1383,13 @@ def call_detail(
         if n.description
     }
     ladder = calls.build_ladder(legs, device_info=device_info, node_desc=node_desc)
+    quality_summary = calls.call_quality_summary(legs, quality)
     return templates.TemplateResponse(
         "call_detail.html",
         _ctx(
             request, session, user,
             call_key=call_key, legs=legs, quality=quality, ladder=ladder,
+            quality_summary=quality_summary,
         ),
     )
 

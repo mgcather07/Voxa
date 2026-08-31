@@ -20,6 +20,7 @@ def _sortable(dt: datetime | None) -> datetime:
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
+from . import mos as mos_lib
 from .models import CallQuality, CallRecord
 
 # Q.850 disconnect causes — the ones an operator actually sees.
@@ -68,9 +69,27 @@ class CallSummary:
     legs: int
     end_cause: int | None
     devices: list[str] = field(default_factory=list)
+    # Representative MOS = the worst measured leg (what the caller actually
+    # heard). None when no leg of the call carries a CMR quality record.
+    mos: float | None = None
 
 
-def _summarize(call_key: str, legs: list[CallRecord]) -> CallSummary:
+def _call_mos(legs: list[CallRecord], qmap: dict[int, CallQuality]) -> float | None:
+    """Worst MOS across a call's legs, or None if no leg was measured."""
+    scores = []
+    for leg in legs:
+        for lid in (leg.orig_leg_id, leg.dest_leg_id):
+            q = qmap.get(lid) if lid else None
+            if q is not None and q.mos is not None:
+                scores.append(q.mos)
+    return round(min(scores), 2) if scores else None
+
+
+def _summarize(
+    call_key: str,
+    legs: list[CallRecord],
+    qmap: dict[int, CallQuality] | None = None,
+) -> CallSummary:
     legs = sorted(legs, key=lambda r: _sortable(r.orig_time))
     first = legs[0]
     last = legs[-1]
@@ -89,7 +108,26 @@ def _summarize(call_key: str, legs: list[CallRecord]) -> CallSummary:
         legs=len(legs),
         end_cause=last.dest_cause if last.dest_cause is not None else last.orig_cause,
         devices=devices,
+        mos=_call_mos(legs, qmap or {}),
     )
+
+
+def _quality_by_leg(
+    session: Session, legs: list[CallRecord]
+) -> dict[int, CallQuality]:
+    """One CMR lookup for a whole batch of legs: {leg_id: CallQuality}."""
+    leg_ids = {
+        lid
+        for leg in legs
+        for lid in (leg.orig_leg_id, leg.dest_leg_id)
+        if lid
+    }
+    if not leg_ids:
+        return {}
+    rows = session.scalars(
+        select(CallQuality).where(CallQuality.leg_id.in_(leg_ids))
+    ).all()
+    return {r.leg_id: r for r in rows}
 
 
 def search_calls(
@@ -100,10 +138,18 @@ def search_calls(
     date_to: str = "",
     min_duration: int = 0,
     answered: str = "",
+    mos_band: str = "",
+    sort: str = "",
     limit: int = 200,
 ) -> tuple[list[CallSummary], int]:
     """Return (call summaries, distinct-call match count). Filters on legs, then
-    groups to calls."""
+    groups to calls, attaches each call's worst-leg MOS, and optionally filters
+    by quality band / sorts by MOS.
+
+    ``mos_band`` is a band key ("excellent"…"bad"), ``"problem"`` for any call
+    below the problem threshold, or "" for all. ``sort`` is "mos_asc",
+    "mos_desc", or "" (most recent first).
+    """
     stmt = select(CallRecord)
     if q:
         needle = f"%{q.strip()}%"
@@ -137,8 +183,26 @@ def search_calls(
     for leg in legs:
         grouped.setdefault(leg.call_key, []).append(leg)
 
-    summaries = [_summarize(k, v) for k, v in grouped.items()]
-    summaries.sort(key=lambda s: _sortable(s.start), reverse=True)
+    qmap = _quality_by_leg(session, list(legs))
+    summaries = [_summarize(k, v, qmap) for k, v in grouped.items()]
+
+    # Quality band filter. A call with no measured MOS never matches a band
+    # (it is not silently treated as 0).
+    if mos_band == "problem":
+        summaries = [s for s in summaries if s.mos is not None
+                     and s.mos < mos_lib.PROBLEM_MAX]
+    elif mos_band:
+        summaries = [s for s in summaries
+                     if s.mos is not None
+                     and mos_lib.band_for(s.mos).key == mos_band]
+
+    if sort == "mos_asc":
+        summaries.sort(key=lambda s: (s.mos is None, s.mos if s.mos is not None else 0))
+    elif sort == "mos_desc":
+        summaries.sort(key=lambda s: (s.mos is None, -(s.mos or 0)))
+    else:
+        summaries.sort(key=lambda s: _sortable(s.start), reverse=True)
+
     return summaries[:limit], len(summaries)
 
 
@@ -168,6 +232,34 @@ def quality_for_legs(session: Session, legs: list[CallRecord]) -> dict[int, Call
         select(CallQuality).where(CallQuality.leg_id.in_(leg_ids))
     ).all()
     return {r.leg_id: r for r in rows}
+
+
+def call_quality_summary(
+    legs: list[CallRecord], quality: dict[int, CallQuality]
+) -> dict | None:
+    """The headline call-quality view for one call: the worst measured leg (the
+    caller's actual experience), its telemetry, and a deterministic likely
+    contributor. Returns None when no leg carries a MOS. Only reports telemetry
+    that was actually collected — never invents codec/concealment fields."""
+    measured = [q for q in quality.values() if q.mos is not None]
+    if not measured:
+        return None
+    worst = min(measured, key=lambda q: q.mos)
+    return {
+        "mos": round(worst.mos, 2),
+        "rating": mos_lib.rating(worst.mos),
+        "device": worst.device,
+        "directory_number": worst.directory_number,
+        "jitter_ms": worst.jitter_ms,
+        "latency_ms": worst.latency_ms,
+        "loss_pct": worst.loss_pct,
+        "packets_lost": worst.packets_lost,
+        "packets_sent": worst.packets_sent,
+        "legs_measured": len(measured),
+        "likely_issue": mos_lib.likely_issue(
+            worst.loss_pct, worst.jitter_ms, worst.latency_ms
+        ),
+    }
 
 
 def _dur(seconds) -> str:

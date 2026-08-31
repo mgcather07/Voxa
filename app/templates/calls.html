@@ -1,7 +1,12 @@
 {% extends "base.html" %}
+{% import "_mos.html" as mosui %}
 {% block title %}Calls &middot; {{ settings.app_name }}{% endblock %}
 {% block page_title %}Call search{% endblock %}
 {% block content %}
+
+{# Current filters minus mos_band/sort, so header/chip links can re-set those. #}
+{% set base %}q={{ filters.q | urlencode }}&device={{ filters.device | urlencode }}&date_from={{ filters.date_from }}&date_to={{ filters.date_to }}&min_duration={{ filters.min_duration or '' }}&answered={{ filters.answered }}{% endset %}
+{% set next_sort = 'mos_desc' if filters.sort == 'mos_asc' else 'mos_asc' %}
 
 <div class="card">
   <form class="callfilter" method="get" action="/calls">
@@ -17,7 +22,19 @@
       <option value="yes" {{ 'selected' if filters.answered == 'yes' }}>Answered</option>
       <option value="no" {{ 'selected' if filters.answered == 'no' }}>No answer</option>
     </select>
+    <select class="filter-select" name="mos_band" title="Filter by call quality">
+      <option value="" {{ 'selected' if not filters.mos_band }}>All quality</option>
+      <option value="problem" {{ 'selected' if filters.mos_band == 'problem' }}>Problem calls (&lt; {{ "%.1f"|format(mos_problem_max) }})</option>
+      {% for b in mos_bands_desc %}
+      <option value="{{ b.key }}" {{ 'selected' if filters.mos_band == b.key }}>{{ b.label }} ({{ b.range_text }})</option>
+      {% endfor %}
+    </select>
+    <input type="hidden" name="sort" value="{{ filters.sort }}">
     <button class="btn btn-primary" type="submit">Search</button>
+    <a class="btn {{ 'btn-primary' if filters.mos_band == 'problem' else 'btn-secondary' }} problem-chip"
+       href="/calls?{{ base }}&mos_band=problem&sort=mos_asc" title="Calls with MOS below {{ "%.1f"|format(mos_problem_max) }}">
+      <span class="dot" style="background:var(--orange)"></span>Problem calls
+    </a>
     <span class="match tnum">{{ match }} call{{ '' if match == 1 else 's' }}{% if match > results|length %} · showing {{ results|length }}{% endif %}</span>
   </form>
 
@@ -26,12 +43,18 @@
       <thead>
         <tr>
           <th>Start</th><th>Calling</th><th>Called</th><th>Devices</th>
-          <th class="num">Duration</th><th>Result</th><th class="num">Legs</th><th></th>
+          <th class="num">Duration</th>
+          <th class="num sortable">
+            <a href="/calls?{{ base }}&mos_band={{ filters.mos_band }}&sort={{ next_sort }}" title="Sort by MOS">MOS
+              {% if filters.sort == 'mos_asc' %}<span class="sort-caret">▲</span>{% elif filters.sort == 'mos_desc' %}<span class="sort-caret">▼</span>{% else %}<span class="sort-caret dim">↕</span>{% endif %}
+            </a>
+          </th>
+          <th>Result</th><th class="num">Legs</th><th></th>
         </tr>
       </thead>
       <tbody>
         {% if not results %}
-        <tr><td colspan="8" class="empty">No calls match. Ingest CDR files, or seed mock data.</td></tr>
+        <tr><td colspan="9" class="empty">No calls match. Ingest CDR files, or seed mock data.</td></tr>
         {% endif %}
         {% for c in results %}
         <tr>
@@ -40,6 +63,7 @@
           <td class="mono">{{ c.final_called or "—" }}</td>
           <td class="mono ink2">{{ c.devices | join(", ") if c.devices else "—" }}</td>
           <td class="num tnum">{{ "%d:%02d"|format(c.duration // 60, c.duration % 60) }}</td>
+          <td class="num">{{ mosui.pill(c.mos | mos_rating) }}</td>
           <td>
             {% if c.answered %}<span class="reg"><span class="dot"></span>answered</span>
             {% else %}<span class="reg down" title="{{ cause_label(c.end_cause) }}"><span class="dot"></span>{{ cause_label(c.end_cause) | lower }}</span>{% endif %}
@@ -52,7 +76,7 @@
     </table>
   </div>
   <div class="footnote">
-    <span>Cradle-to-grave: click <strong>Trace</strong> for every leg of a call, its quality, and a ladder of the flow.</span>
+    <span>Each call's MOS is its worst measured leg — what the caller actually heard. Click <strong>Trace</strong> for every leg, its quality, and a ladder of the flow.</span>
   </div>
 </div>
 {% endblock %}

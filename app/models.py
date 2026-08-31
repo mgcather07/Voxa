@@ -316,6 +316,39 @@ class Certificate(Base):
     )
 
 
+class CertTarget(Base):
+    """A non-CUCM TLS endpoint to include in the certificate scan — a CUBE
+    (Cisco Unified Border Element) or other SBC / voice gateway. CUCM nodes are
+    discovered automatically from the cluster; these are operator-entered because
+    a CUBE isn't in CUCM's `processnode`. Read-only, like the rest of the cert
+    check: Voxa only reads the certificate each host serves on a TLS handshake."""
+
+    __tablename__ = "cert_targets"
+    __table_args__ = (UniqueConstraint("host", name="uq_cert_targets_host"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    host: Mapped[str] = mapped_column(String(128), index=True)
+    label: Mapped[str | None] = mapped_column(String(128))
+    kind: Mapped[str] = mapped_column(String(32), default="cube")
+    # Comma-separated TLS ports to probe; default = SIP-TLS + HTTPS management.
+    ports: Mapped[str] = mapped_column(String(128), default="5061,8443")
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow
+    )
+
+    def port_list(self) -> list[int]:
+        """Parsed, de-duplicated, validated ports; falls back to the defaults."""
+        out: list[int] = []
+        for tok in (self.ports or "").replace(" ", ",").split(","):
+            tok = tok.strip()
+            if tok.isdigit():
+                p = int(tok)
+                if 1 <= p <= 65535 and p not in out:
+                    out.append(p)
+        return out or [5061, 8443]
+
+
 class CatalogOverride(Base):
     """Admin edits to the model catalog, made on the Catalog page. Overrides the
     config/models.yaml defaults per model key (DB wins), so an admin never needs

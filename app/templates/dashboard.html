@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% import "_mos.html" as mosui %}
 {% block title %}Inventory overview &middot; {{ settings.app_name }}{% endblock %}
 {% block page_title %}Inventory overview{% endblock %}
 {% block content %}
@@ -91,10 +92,75 @@
       <span class="cs-value tnum" style="color:var(--orange)">{{ call_activity.unused | comma }}</span>
       <span class="cs-label">unused ({{ call_activity.unused_pct }}%) — retire, don't replace</span>
     </div>
+    {% if mos_stats.has_mos %}
     <div class="callstat">
-      <span class="cs-value tnum" style="color:{{ 'var(--green)' if call_activity.avg_mos and call_activity.avg_mos >= 4 else 'var(--orange)' }}">{{ call_activity.avg_mos or "—" }}</span>
-      <span class="cs-label">inventory average MOS</span>
+      {% set hero = mos_stats.average_rating %}
+      <span class="cs-value tnum" style="color:{{ hero.color }}">{{ "%.2f"|format(mos_stats.average) }}</span>
+      <span class="cs-label">average MOS · <span style="color:{{ hero.color }};font-weight:700">{{ hero.label|upper }}</span></span>
     </div>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+
+{% if mos_stats.has_mos %}
+{% set hero = mos_stats.average_rating %}
+<div class="card mosq">
+  <div class="card-head">
+    <h2>Call quality
+      <span class="info-tip" tabindex="0" aria-label="What is MOS?"
+            title="Mean Opinion Score (MOS) estimates perceived voice-call quality using factors such as packet loss, jitter, latency, codec performance, and packet-loss concealment. Higher scores indicate better voice quality.">i</span>
+    </h2>
+    <span class="subhead">MOS from CMR — how good the calls actually sound (1.0–5.0)</span>
+  </div>
+
+  <div class="mosq-grid">
+    <div class="mosq-hero">
+      <div class="mosq-score tnum" style="color:{{ hero.color }}">{{ "%.2f"|format(mos_stats.average) }}</div>
+      <div class="mosq-label" style="color:{{ hero.color }}">{{ hero.label|upper }}</div>
+      <div class="mosq-cap">Inventory average MOS</div>
+      {{ mosui.scale(hero) }}
+    </div>
+
+    <div class="mosq-side">
+      <div class="mosq-stats">
+        <div class="mosq-stat">
+          <span class="ms-l">Lowest MOS</span>
+          <span class="ms-v tnum" style="color:{{ mos_stats.minimum_rating.color }}">{{ "%.2f"|format(mos_stats.minimum) }}</span>
+          <span class="ms-s" style="color:{{ mos_stats.minimum_rating.color }}">{{ mos_stats.minimum_rating.label|upper }}</span>
+        </div>
+        <div class="mosq-stat">
+          <span class="ms-l">Below {{ mos_stats.below_a_label }}</span>
+          <span class="ms-v tnum" style="color:{{ 'var(--red)' if mos_stats.below_a else 'var(--ink-2)' }}">{{ mos_stats.below_a | comma }}</span>
+          <span class="ms-s">{{ mos_stats.below_a }} legs · {{ mos_stats.below_a_pct }}%</span>
+        </div>
+        <div class="mosq-stat">
+          <span class="ms-l">Below {{ mos_stats.below_b_label }}</span>
+          <span class="ms-v tnum" style="color:{{ 'var(--orange)' if mos_stats.below_b else 'var(--ink-2)' }}">{{ mos_stats.below_b | comma }}</span>
+          <span class="ms-s">{{ mos_stats.below_b }} legs · {{ mos_stats.below_b_pct }}%</span>
+        </div>
+        <div class="mosq-stat">
+          <span class="ms-l">Problem legs</span>
+          <a class="ms-v tnum" href="/calls?mos_band=problem&amp;sort=mos_asc" style="color:{{ 'var(--orange)' if mos_stats.problem else 'var(--ink-2)' }}">{{ mos_stats.problem | comma }}</a>
+          <span class="ms-s">MOS &lt; {{ "%.1f"|format(mos_problem_max) }} · {{ mos_stats.problem_pct }}% — trace</span>
+        </div>
+      </div>
+
+      <div class="mos-dist">
+        {% for d in mos_stats.distribution %}
+        <a class="mos-dist-row" href="/calls?mos_band={{ d.key }}&amp;sort=mos_asc" title="{{ d.count | comma }} legs · MOS {{ d.range }}">
+          <span class="md-l"><i style="background:{{ d.color }}"></i>{{ d.label }}</span>
+          <span class="md-track"><span class="md-fill" style="width:{{ d.pct }}%;background:{{ d.color }}"></span></span>
+          <span class="md-v tnum">{{ d.pct }}%</span>
+          <span class="md-c tnum">{{ d.count | comma }}</span>
+        </a>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <div class="footnote">
+    <span>MOS calculated from {{ mos_stats.sample | comma }} measured call legs — legs without a MOS are excluded, never counted as zero.</span>
   </div>
 </div>
 {% endif %}

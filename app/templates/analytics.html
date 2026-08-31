@@ -20,8 +20,9 @@
       <div class="value-row"><span class="value tnum" style="color:var(--green)">{{ a.answered_pct }}%</span></div>
       <div class="progress"><span style="width:{{ a.answered_pct }}%;background:var(--green)"></span></div>
       <div class="note">{{ a.missed | comma }} missed ({{ a.missed_pct }}%)</div></div>
+    {% set ar = a.avg_mos | mos_rating %}
     <div class="tile"><div class="label">Inventory avg MOS</div>
-      <div class="value-row"><span class="value tnum" style="color:{{ 'var(--green)' if a.avg_mos and a.avg_mos >= 4 else 'var(--orange)' }}">{{ a.avg_mos or "—" }}</span></div>
+      <div class="value-row"><span class="value tnum" style="color:{{ ar.color }}">{{ a.avg_mos or "—" }}</span>{% if ar.has_score %}<span class="unit" style="color:{{ ar.color }}">{{ ar.label }}</span>{% endif %}</div>
       <div class="note">call quality</div></div>
     <div class="tile"><div class="label">Busy hour</div>
       <div class="value-row"><span class="value tnum">{{ (a.busy_hour.hour | hclock) if a.busy_hour else "—" }}</span></div>
@@ -70,10 +71,10 @@
     </div>
 
     <div class="card">
-      <div class="card-head"><h2>Call quality</h2><span class="subhead">MOS distribution</span></div>
+      <div class="card-head"><h2>Call quality</h2><span class="subhead">MOS distribution across {{ a.quality_total | comma }} measured legs</span></div>
       {% for qb in a.quality %}
       <div class="plan-line" style="padding:7px 0">
-        <span class="name" style="min-width:150px">{{ qb.label }} <span style="color:var(--ink-3)">{{ qb.range }}</span></span>
+        <span class="name" style="min-width:170px"><i class="qb-dot" style="background:{{ qb.color }}"></i>{{ qb.label }} <span style="color:var(--ink-3)">{{ qb.range }}</span></span>
         <div class="track"><span style="width:{{ (100 * qb.count / a.quality_total) | round | int }}%;background:{{ qb.color }};display:block;height:100%;border-radius:999px"></span></div>
         <span class="count tnum">{{ qb.count | comma }}</span>
       </div>
@@ -108,9 +109,10 @@
       <div class="muted" style="font-size:12.5px">No poor-quality calls. Nice.</div>
       {% endif %}
       {% for qi in a.quality_issues %}
-      <a class="change-row pair" href="/calls/{{ qi.call_key }}" style="grid-template-columns:minmax(0,1.4fr) 52px 1fr">
+      {% set qir = qi.mos | mos_rating %}
+      <a class="change-row pair" href="/calls/{{ qi.call_key }}" style="grid-template-columns:minmax(0,1.4fr) 92px 1fr">
         <span class="mono dev">{{ qi.device or "—" }}</span>
-        <span class="now" style="color:{{ 'var(--red)' if qi.mos < 3.3 else 'var(--orange)' }}">MOS {{ qi.mos }}</span>
+        <span class="now" style="color:{{ qir.color }}">MOS {{ qi.mos }} · {{ qir.label }}</span>
         <span class="was">{{ qi.loss_pct }}% loss · {{ qi.jitter_ms }}ms jitter</span>
       </a>
       {% endfor %}

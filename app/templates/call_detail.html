@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% import "_mos.html" as mosui %}
 {% block title %}Call {{ call_key }} &middot; {{ settings.app_name }}{% endblock %}
 {% block page_title %}Call trace{% endblock %}
 {% block content %}
@@ -19,6 +20,61 @@
     </div>
   </div>
 </div>
+
+{% if quality_summary %}
+{% set r = quality_summary.rating %}
+<div class="card callq {{ r.css }}">
+  <div class="card-head">
+    <h2>Call quality</h2>
+    <span class="subhead">worst measured leg — what the caller actually heard</span>
+  </div>
+  <div class="callq-grid">
+    <div class="callq-hero" style="border-color:color-mix(in srgb, {{ r.color }} 40%, transparent);background:color-mix(in srgb, {{ r.color }} 8%, transparent)">
+      <div class="callq-mos tnum" style="color:{{ r.color }}">MOS {{ "%.2f"|format(quality_summary.mos) }}</div>
+      <div class="callq-label" style="color:{{ r.color }}">{{ r.label|upper }}</div>
+      {% if quality_summary.device %}
+      <div class="callq-dev mono">{{ quality_summary.device }}{% if quality_summary.directory_number %} · {{ quality_summary.directory_number }}{% endif %}</div>
+      {% endif %}
+      {% if quality_summary.likely_issue %}
+      <div class="callq-cause">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="var(--orange)" aria-hidden="true"><path d="M12 2 1.5 21h21L12 2Zm0 6 1 7h-2l1-7Zm0 9.2a1.3 1.3 0 1 1 0 2.6 1.3 1.3 0 0 1 0-2.6Z"/></svg>
+        <span><b>Likely contributor:</b> {{ quality_summary.likely_issue }}</span>
+      </div>
+      {% endif %}
+    </div>
+
+    <div class="callq-metrics">
+      {% if quality_summary.loss_pct is not none %}
+      <div class="callq-metric m-{{ mos_metric_health('loss', quality_summary.loss_pct) }}">
+        <span class="cm-l">Packet loss</span>
+        <span class="cm-v tnum">{{ quality_summary.loss_pct }}%</span>
+        {% if quality_summary.packets_sent %}<span class="cm-s tnum">{{ quality_summary.packets_lost | comma }} of {{ quality_summary.packets_sent | comma }} pkts</span>{% endif %}
+      </div>
+      {% endif %}
+      {% if quality_summary.jitter_ms is not none %}
+      <div class="callq-metric m-{{ mos_metric_health('jitter', quality_summary.jitter_ms) }}">
+        <span class="cm-l">Jitter</span>
+        <span class="cm-v tnum">{{ quality_summary.jitter_ms }} ms</span>
+      </div>
+      {% endif %}
+      {% if quality_summary.latency_ms is not none %}
+      <div class="callq-metric m-{{ mos_metric_health('latency', quality_summary.latency_ms) }}">
+        <span class="cm-l">Latency</span>
+        <span class="cm-v tnum">{{ quality_summary.latency_ms }} ms</span>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+  <div class="footnote">
+    <span>Quality measured on {{ quality_summary.legs_measured }} leg{{ '' if quality_summary.legs_measured == 1 else 's' }} of this call. Only telemetry CUCM actually reported (MOS, packet loss, jitter, latency) is shown.</span>
+  </div>
+</div>
+{% else %}
+<div class="card">
+  <div class="card-head"><h2>Call quality</h2><span class="subhead">from CMR</span></div>
+  <div class="muted" style="font-size:12.5px">No MOS was reported for this call — no CMR quality record was ingested for its legs.</div>
+</div>
+{% endif %}
 
 <div class="card">
   <div class="card-head">
@@ -88,10 +144,10 @@
           <td class="mono">{{ (l.connect_time | ftime) if l.connect_time else "—" }}</td>
           <td class="num tnum">{{ "%d:%02d"|format(l.duration // 60, l.duration % 60) }}</td>
           <td class="ink2">{{ cause_label(l.dest_cause if l.dest_cause is not none else l.orig_cause) }}</td>
-          <td class="num tnum" style="color:{{ 'var(--green)' if best and best.mos and best.mos >= 4 else 'var(--orange)' if best and best.mos and best.mos >= 3.5 else 'var(--red)' if best and best.mos else 'var(--ink-3)' }}">{{ best.mos if best and best.mos else "—" }}</td>
-          <td class="num tnum ink2">{{ (best.jitter_ms ~ " ms") if best and best.jitter_ms is not none else "—" }}</td>
-          <td class="num tnum ink2">{{ (best.latency_ms ~ " ms") if best and best.latency_ms is not none else "—" }}</td>
-          <td class="num tnum ink2">{{ (best.loss_pct ~ "%") if best and best.loss_pct is not none else "—" }}</td>
+          <td class="num">{{ mosui.pill((best.mos if best else none) | mos_rating) }}</td>
+          <td class="num tnum {{ 'metric-' ~ mos_metric_health('jitter', best.jitter_ms) if best and best.jitter_ms is not none else 'ink2' }}">{{ (best.jitter_ms ~ " ms") if best and best.jitter_ms is not none else "—" }}</td>
+          <td class="num tnum {{ 'metric-' ~ mos_metric_health('latency', best.latency_ms) if best and best.latency_ms is not none else 'ink2' }}">{{ (best.latency_ms ~ " ms") if best and best.latency_ms is not none else "—" }}</td>
+          <td class="num tnum {{ 'metric-' ~ mos_metric_health('loss', best.loss_pct) if best and best.loss_pct is not none else 'ink2' }}">{{ (best.loss_pct ~ "%") if best and best.loss_pct is not none else "—" }}</td>
         </tr>
         {% endfor %}
       </tbody>

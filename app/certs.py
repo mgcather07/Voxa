@@ -21,7 +21,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from . import settings_store
-from .models import Certificate, ClusterNode
+from .models import Certificate, CertTarget, ClusterNode
 
 log = logging.getLogger(__name__)
 
@@ -33,6 +33,20 @@ PORTS = [
     (5061, "CallManager (SIP-TLS)"),
     (2443, "CAPF"),
 ]
+
+# Friendly service names for the ports a CUBE / SBC typically serves. 5061 is
+# the cert on secure SIP trunks (expiry drops the trunk); 8443/443 is the IOS-XE
+# HTTPS management / RESTCONF interface. Anything else is labelled generically.
+CUBE_PORT_SERVICE = {
+    5061: "SIP-TLS (secure trunk)",
+    5062: "SIP-TLS (secure trunk)",
+    8443: "HTTPS (management)",
+    443: "HTTPS (management)",
+}
+
+
+def _cube_service(port: int) -> str:
+    return CUBE_PORT_SERVICE.get(port, f"TLS :{port}")
 
 
 def classify_error(error: str | None) -> dict | None:
@@ -134,12 +148,23 @@ def _targets(session: Session) -> list[tuple[str, str]]:
 
 def collect(session: Session, timeout: float = 4.0) -> dict:
     """Probe every (target, port), replacing the stored Certificate rows.
-    Read-only against CUCM. Returns a small summary."""
+    Read-only against CUCM and every CUBE. Returns a small summary.
+
+    Targets are the CUCM cluster hosts + discovered nodes (on the CUCM ports)
+    plus any operator-added CUBE / SBC endpoints (on their own ports)."""
     jobs = [
         (host, label, port, svc)
         for host, label in _targets(session)
         for port, svc in PORTS
     ]
+    cube_hosts: set[str] = set()
+    for t in session.scalars(
+        select(CertTarget).where(CertTarget.enabled.is_(True))
+    ).all():
+        cube_hosts.add(t.host)
+        label = t.label or t.host
+        for port in t.port_list():
+            jobs.append((t.host, label, port, _cube_service(port)))
 
     def probe(job):
         host, label, port, svc = job
@@ -162,4 +187,5 @@ def collect(session: Session, timeout: float = 4.0) -> dict:
     for row in rows:
         session.add(row)
     return {"targets": len({j[0] for j in jobs}), "checked": len(rows),
-            "ok": sum(1 for r in rows if not r.error)}
+            "ok": sum(1 for r in rows if not r.error),
+            "cubes": len(cube_hosts)}
