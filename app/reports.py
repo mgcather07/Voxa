@@ -355,18 +355,19 @@ def call_activity(session: Session) -> dict:
 
 
 def unverified_models(session: Session) -> list[str]:
-    """Models in use whose catalog entry has not been fact-checked yet."""
+    """Catalog models in use that haven't been fact-checked yet. Excludes the
+    'unknown' catch-all — devices whose CUCM string doesn't map to a catalog
+    model are a recognition gap, not a Cisco-data-sheet to verify."""
     catalog = get_catalog()
     keys = session.scalars(
         select(func.distinct(Phone.model_raw)).where(Phone.model_raw.is_not(None))
     ).all()
-    return sorted(
-        {
-            catalog.lookup(raw).key
-            for raw in keys
-            if not catalog.lookup(raw).verified
-        }
-    )
+    out = set()
+    for raw in keys:
+        info = catalog.lookup(raw)
+        if info.key != "unknown" and not info.verified:
+            out.add(info.key)
+    return sorted(out)
 
 
 # ---------------------------------------------------------------------------
