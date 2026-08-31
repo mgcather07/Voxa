@@ -141,10 +141,89 @@ class LdapAuthBackend:
     def authenticate(
         self, session: Session, username: str, password: str
     ) -> User | None:
-        raise NotImplementedError(
-            "LDAP authentication is not implemented yet. "
-            "Set AUTH_BACKEND=local."
+        # ldap3 is an optional dependency — only LDAP deployments need it.
+        # See requirements-ldap.txt.
+        try:
+            import ldap3
+            from ldap3.core.exceptions import LDAPBindError, LDAPException
+            from ldap3.utils.conv import escape_filter_chars
+        except ImportError as exc:  # pragma: no cover - env dependent
+            raise NotImplementedError(
+                "LDAP auth needs ldap3: pip install -r requirements-ldap.txt"
+            ) from exc
+
+        s = self.settings
+        if not (s.ldap_url and s.ldap_bind_dn and s.ldap_user_base_dn):
+            raise NotImplementedError(
+                "LDAP is not configured (set LDAP_URL, LDAP_BIND_DN, "
+                "LDAP_USER_BASE_DN)."
+            )
+        # Never allow an empty password: many directories treat an empty bind
+        # password as an anonymous bind, which would succeed and be a bypass.
+        if not password:
+            return None
+
+        server = ldap3.Server(
+            s.ldap_url,
+            use_ssl=s.ldap_url.lower().startswith("ldaps"),
+            get_info=ldap3.NONE,
         )
+        try:
+            # 1. Bind as the service account and find the user's DN + groups.
+            svc = ldap3.Connection(
+                server, s.ldap_bind_dn, s.ldap_bind_password, auto_bind=True
+            )
+            flt = s.ldap_user_filter.format(
+                username=escape_filter_chars(username.strip())
+            )
+            svc.search(
+                s.ldap_user_base_dn,
+                flt,
+                attributes=["displayName", "mail", "memberOf"],
+            )
+            if not svc.entries:
+                svc.unbind()
+                return None
+            entry = svc.entries[0]
+            user_dn = entry.entry_dn
+            display = str(entry.displayName) if "displayName" in entry else username
+            email = str(entry.mail) if "mail" in entry else None
+            groups = [str(g) for g in entry.memberOf] if "memberOf" in entry else []
+            svc.unbind()
+
+            # 2. Re-bind as the user with the supplied password — this is the
+            #    actual authentication. We never store the AD password.
+            try:
+                user_conn = ldap3.Connection(
+                    server, user_dn, password, auto_bind=True
+                )
+                user_conn.unbind()
+            except LDAPBindError:
+                log.warning("LDAP bind failed for %r", username)
+                return None
+
+            # 3. Group gate.
+            if s.ldap_required_group and s.ldap_required_group not in groups:
+                log.warning("LDAP user %r not in required group", username)
+                return None
+        except LDAPException as exc:  # pragma: no cover - env dependent
+            log.error("LDAP error authenticating %r: %s", username, exc)
+            raise NotImplementedError(f"LDAP error: {exc}") from exc
+
+        # 4. Upsert a local shadow account (source=ldap, no password stored) so
+        #    the rest of the app — audit trail, admin flags — works identically.
+        uname = username.strip().lower()
+        user = session.scalars(select(User).where(User.username == uname)).first()
+        if user is None:
+            user = User(username=uname, source="ldap", is_admin=False)
+            session.add(user)
+        user.display_name = display
+        user.email = email
+        user.source = "ldap"
+        if not user.is_active:
+            return None
+        session.commit()
+        return user
 
 
 def get_backend(settings: Settings | None = None) -> AuthBackend:

@@ -1,0 +1,13 @@
+# Optional: only needed when AUTH_BACKEND=ldap. The base image ships with local
+# auth (stdlib scrypt) and no LDAP dependency. To enable Active Directory / LDAP:
+#
+#   1. add this to the image — in the Dockerfile, after the main requirements:
+#        RUN pip install --no-cache-dir -r requirements-ldap.txt
+#      (and COPY requirements-ldap.txt . before it), or
+#      pip install it into the running container for a quick test.
+#   2. set AUTH_BACKEND=ldap and the LDAP_* values in .env.prod.
+#
+# Keep LocalAuthBackend reachable as a break-glass path when a domain controller
+# is unreachable (see docs/ROADMAP.md and app/auth.py).
+
+ldap3==2.9.1
