@@ -258,6 +258,20 @@ answer "which phones does nobody use, so we needn't replace them" — not raw ca
 records. The app never opens an SFTP connection itself; landing the files is the
 OS's job, same as scheduled collection.
 
+### SNMP PoE polling (optional)
+
+To show each switch's *real* PoE draw and budget next to the class-ceiling
+estimate, enable SNMP: add pysnmp to the image (`requirements-snmp.txt`), set
+`SNMP_ENABLED=true` and `SNMP_COMMUNITY`, then poll on a schedule:
+
+```bash
+make poll        # read-only SNMP against the CDP-discovered switches
+```
+
+Polling is read-only (SNMP GET/walk) and targets the switch IPs Voxa already
+discovered; the PoE page adds Real draw / Available / Headroom columns once data
+is present.
+
 ---
 
 ## Schema changes

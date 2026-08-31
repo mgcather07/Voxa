@@ -693,6 +693,7 @@ def _poe_context(session: Session, family: str) -> dict:
         "total_ports": sum(s["ports"] for s in switches),
         "now_width": round(100 * total_current / span),
         "add_width": max(0, round(100 * delta / span)),
+        "has_snmp": any(s.get("available") is not None for s in switches),
     }
 
 

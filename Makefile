@@ -1,7 +1,7 @@
 .PHONY: help install dev mock user check \
         dev-up dev-seed dev-logs dev-down dev-reset \
         image image-save image-load image-push bundle release \
-        up down logs backup restore shell create-user collect
+        up down logs backup restore shell create-user collect ingest poll
 
 # --- Configuration ----------------------------------------------------------
 # Interpreter for the local dev venv. The stock macOS `python3` may be too old
@@ -58,6 +58,7 @@ help:
 	@echo "  make create-user NAME=alice   create an admin login"
 	@echo "  make collect      run one collection now (schedule via cron/timer)"
 	@echo "  make ingest       fold CDR/CMR files from CDR_DIR into call stats"
+	@echo "  make poll         SNMP-poll switches for real PoE (needs pysnmp)"
 	@echo "  make backup       dump the database to ./backups"
 	@echo "  make restore FILE=backups/voxa_X.sql.gz   restore a dump"
 	@echo "  make shell        psql into the running database"
@@ -181,6 +182,9 @@ collect:
 
 ingest:
 	$(PROD) exec -T app python scripts/ingest_cdr.py
+
+poll:
+	$(PROD) exec -T app python scripts/poll_switches.py
 
 backup:
 	@mkdir -p backups

@@ -88,6 +88,11 @@
             <th class="num">Reserved now</th>
             <th class="num">After swap</th>
             <th class="num">Change</th>
+            {% if has_snmp %}
+            <th class="num">Real draw</th>
+            <th class="num">Available</th>
+            <th class="num">Headroom</th>
+            {% endif %}
             <th style="width:190px">Growth</th>
           </tr>
         </thead>
@@ -101,6 +106,11 @@
             <td class="num ink2">{{ s.current_w | round | int }} W</td>
             <td class="num" style="font-weight:700">{{ s.future_w | round | int }} W</td>
             <td class="num delta {{ 'up' if sd > 0 else 'down' if sd < 0 else 'zero' }}" style="font-weight:700">{{ "+" if sd > 0 }}{{ sd }} W</td>
+            {% if has_snmp %}
+            <td class="num ink2">{{ (s.real_used | round | int ~ " W") if s.real_used is not none else "—" }}</td>
+            <td class="num ink2">{{ (s.available | round | int ~ " W") if s.available is not none else "—" }}</td>
+            <td class="num delta {{ 'down' if s.headroom_after is not none and s.headroom_after >= 0 else 'up' if s.headroom_after is not none else 'zero' }}" style="font-weight:700">{{ (s.headroom_after | round | int ~ " W") if s.headroom_after is not none else "—" }}</td>
+            {% endif %}
             <td>
               <div class="growth">
                 <div class="track"><span class="{{ 'g-high' if s.pct_change > 40 else 'g-mid' if s.pct_change > 15 else 'g-low' }}" style="width: {{ [[s.pct_change, 0] | max, 100] | min }}%"></span></div>

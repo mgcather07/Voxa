@@ -72,8 +72,19 @@ records — enough to answer "which phones does nobody use?".
 - ✅ Phone 360: call volume / talk time / last call / MOS, or "retire not replace"
 - ✅ Dashboard call-activity card + an "unused phones" report
 
-## Phase 6 — Enablers  ⬜
-- ⬜ AD/LDAP auth (finish the stubbed `LdapAuthBackend`) — *dep: ldap3*
-- ⬜ Multi-cluster (cluster model; cluster-aware collection + filters)
-- ⬜ SNMP PoE polling (real draw vs class ceiling) — *dep: pysnmp*, roadmap #2
-- ⬜ CSV device import (Call Telemetry's "CSV lists" discovery)
+## Phase 6 — Enablers  ✅
+- ✅ CSV device import (`/import` + `scripts/import_csv.py`)
+- ✅ Multi-cluster: `Phone.cluster` tag, cluster filter + dashboard breakdown;
+     collect per cluster with its own `CLUSTER_NAME`
+- ✅ AD/LDAP auth: `LdapAuthBackend` implemented; ldap3 optional
+     (`requirements-ldap.txt`)
+- ✅ SNMP PoE polling: `app/snmp.py` + `scripts/poll_switches.py`; PoE page shows
+     real draw / available / headroom; pysnmp optional (`requirements-snmp.txt`)
+
+---
+
+All six phases complete. Deliberately **not** built (they would make Voxa write
+to CUCM/phones and forfeit its read-only approval): call blocking, the policy
+engine, spam redirect, live remote control, factory reset/ITL, greeting
+injection. Raw cradle-to-grave CDR investigation is also out of scope — Voxa
+keeps call *aggregates*, not a call-record store.

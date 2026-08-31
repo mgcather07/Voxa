@@ -1,0 +1,9 @@
+# Optional: only needed for SNMP PoE polling (make poll / scripts/poll_switches.py).
+# The base image ships without it. To enable:
+#   1. add to the image: COPY requirements-snmp.txt . then
+#        RUN pip install --no-cache-dir -r requirements-snmp.txt
+#      (or pip install into the running container for a quick test), and
+#   2. set SNMP_ENABLED=true and SNMP_COMMUNITY in .env.prod.
+# Polling is read-only (SNMP GET/walk) — nothing is written to a switch.
+
+pysnmp==6.2.6

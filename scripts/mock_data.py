@@ -22,6 +22,7 @@ from app.models import (  # noqa: E402
     LocationRule,
     Phone,
     PhoneSnapshot,
+    SwitchPoll,
     SyncRun,
 )
 
@@ -96,6 +97,7 @@ def main() -> None:
         if wipe:
             session.query(PhoneSnapshot).delete()
             session.query(CallStat).delete()
+            session.query(SwitchPoll).delete()
             session.query(LocationRule).delete()
             session.query(Location).delete()
             session.query(Phone).delete()
@@ -182,8 +184,31 @@ def main() -> None:
         _seed_history(session, created_phones, now)
         _seed_locations(session)
         _seed_call_stats(session, created_phones, now)
+        _seed_switch_polls(session, created_phones, now)
 
     print(f"Seeded {count} mock phones across {len(SITES)} sites.")
+
+
+def _seed_switch_polls(session, phones: list[Phone], now: datetime) -> None:
+    """Fake SNMP results per switch (real draw + budget), so the PoE page can
+    show real numbers next to the class-ceiling estimate."""
+    # phones per switch -> a plausible real draw
+    per_switch: dict[str, int] = {}
+    for p in phones:
+        if p.switch_name:
+            per_switch[p.switch_name] = per_switch.get(p.switch_name, 0) + 1
+    for switch, ports in per_switch.items():
+        budget = random.choice([370.0, 740.0, 1440.0])
+        # real draw roughly 5-9 W/phone port plus some non-phone load, capped.
+        draw = min(budget * 0.95, ports * random.uniform(5.0, 9.0) + random.uniform(0, 60))
+        session.add(
+            SwitchPoll(
+                switch_name=switch,
+                available_watts=round(budget, 1),
+                used_watts=round(draw, 1),
+                polled_at=now,
+            )
+        )
 
 
 def _seed_call_stats(session, phones: list[Phone], now: datetime) -> None:

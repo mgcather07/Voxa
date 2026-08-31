@@ -8,7 +8,7 @@ from sqlalchemy import case, func, select
 from sqlalchemy.orm import Session
 
 from .catalog import DEFAULT_FAMILY, get_catalog
-from .models import CallStat, Phone
+from .models import CallStat, Phone, SwitchPoll
 
 
 @dataclass
@@ -269,10 +269,23 @@ def poe_by_switch(session: Session, family: str = DEFAULT_FAMILY) -> list[dict]:
         entry["current_w"] += current_w
         entry["future_w"] += future_w
 
+    polls = {p.switch_name: p for p in session.scalars(select(SwitchPoll)).all()}
+
     out = []
     for entry in switches.values():
         current = round(entry["current_w"], 1)
         future = round(entry["future_w"], 1)
+        poll = polls.get(entry["switch_name"])
+        real_used = (
+            round(poll.used_watts, 1)
+            if poll and poll.used_watts is not None
+            else None
+        )
+        available = (
+            round(poll.available_watts, 1)
+            if poll and poll.available_watts is not None
+            else None
+        )
         out.append(
             {
                 "switch_name": entry["switch_name"],
@@ -283,6 +296,11 @@ def poe_by_switch(session: Session, family: str = DEFAULT_FAMILY) -> list[dict]:
                 "delta_w": round(future - current, 1),
                 "pct_change": (
                     round(100 * (future - current) / current) if current else 0
+                ),
+                "real_used": real_used,
+                "available": available,
+                "headroom_after": (
+                    round(available - future, 1) if available is not None else None
                 ),
             }
         )

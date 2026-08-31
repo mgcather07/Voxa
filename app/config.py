@@ -43,6 +43,13 @@ class Settings(BaseSettings):
     # scripts/ingest_cdr.py; the app never opens an SFTP connection itself.
     cdr_dir: str = "/var/lib/voxa/cdr"
 
+    # SNMP polling of access switches for real PoE draw / budget (read-only).
+    # Needs pysnmp (requirements-snmp.txt). Switches are the CDP neighbours Voxa
+    # already discovered (Phone.switch_ip); this is the SNMPv2c community.
+    snmp_enabled: bool = False
+    snmp_community: str = "public"
+    snmp_timeout: int = 2
+
     # Authentication
     # secret_key signs the session cookie. Generate with:
     #   python -c "import secrets; print(secrets.token_urlsafe(48))"

@@ -174,6 +174,25 @@ class CallStat(Base):
         return round(self.total_seconds / 60)
 
 
+class SwitchPoll(Base):
+    """Real PoE numbers polled from an access switch via SNMP, to compare with
+    the class-ceiling estimate: what the switch actually draws now, and its total
+    PoE budget. Keyed by switch name so it lines up with CDP-discovered ports."""
+
+    __tablename__ = "switch_polls"
+    __table_args__ = (
+        UniqueConstraint("switch_name", name="uq_switch_polls_switch_name"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    switch_name: Mapped[str] = mapped_column(String(128), index=True)
+    available_watts: Mapped[float | None] = mapped_column(Float)
+    used_watts: Mapped[float | None] = mapped_column(Float)
+    polled_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow
+    )
+
+
 class Location(Base):
     """A dispatchable location for E911. Voxa-owned data (never from CUCM)."""
 
