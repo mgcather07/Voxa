@@ -69,6 +69,11 @@ def classify_error(error: str | None) -> dict | None:
                 "hint": "host reachable but the port is closed (service not listening)"}
     if "reset" in e:
         return {"label": "connection reset", "pill": "eos", "hint": error}
+    if "handshake" in e or "alert" in e or "wrong_version" in e or "unexpected_eof" in e:
+        return {"label": "TLS handshake failed", "pill": "eos",
+                "hint": "the port answered but the TLS handshake failed — the "
+                        "endpoint may require a client certificate (mutual TLS, "
+                        "common on a CUBE secure trunk) or a different TLS version"}
     if "ssl" in e or "certificate" in e:
         return {"label": "TLS error", "pill": "eos", "hint": error}
     return {"label": "unreachable", "pill": "unknown", "hint": error}
@@ -102,6 +107,20 @@ def fetch_cert(host: str, port: int, timeout: float = 4.0) -> dict:
     ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
     ctx.check_hostname = False
     ctx.verify_mode = ssl.CERT_NONE  # inspecting, not validating trust
+    # Be permissive on TLS version and ciphers. This is a read-only certificate
+    # read, and older gear (IOS-XE CUBEs, legacy nodes) may only offer TLS 1.0/1.1
+    # or legacy ciphers that modern OpenSSL disables by default. Lowering the floor
+    # only *allows* older TLS — a healthy TLS 1.2/1.3 peer still negotiates its
+    # highest, so this never downgrades a CUCM read. It also separates a version/
+    # cipher mismatch (now succeeds) from a mutual-TLS requirement (still fails).
+    try:
+        ctx.minimum_version = ssl.TLSVersion.MINIMUM_SUPPORTED
+    except (ValueError, AttributeError):  # pragma: no cover - OpenSSL policy
+        pass
+    try:
+        ctx.set_ciphers("DEFAULT@SECLEVEL=0")  # re-enable legacy ciphers/keys
+    except ssl.SSLError:  # pragma: no cover - cipher string rejected
+        pass
     try:
         with socket.create_connection((host, port), timeout) as sock:
             with ctx.wrap_socket(sock, server_hostname=host) as ss:

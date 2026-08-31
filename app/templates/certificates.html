@@ -9,7 +9,7 @@
   <td>{{ c.service }} <span style="color:var(--ink-3)">:{{ c.port }}</span></td>
   {% if c.error %}
   {% set f = c.error | cert_fail %}
-  <td colspan="4" class="desc" style="color:var(--ink-3)" title="{{ c.error }}">{{ f.hint }}</td>
+  <td colspan="4" class="desc" style="color:var(--ink-3)">{{ f.hint }}<div class="cert-raw mono">{{ c.error }}</div></td>
   <td><span class="pill {{ f.pill }}" title="{{ c.error }}">{{ f.label }}</span></td>
   {% else %}
   <td class="desc" title="SAN: {{ c.san or 'none' }}">{{ c.subject_cn or '—' }}</td>
@@ -31,12 +31,7 @@
 </tr>
 {% endmacro %}
 
-{% macro cert_table(title, sub, rows) %}
-{% if rows %}
-<div class="cert-section">
-  <span class="cert-section-t">{{ title }}</span>
-  <span class="cert-section-s">{{ sub }}</span>
-</div>
+{% macro cert_table(rows) %}
 <div style="overflow-x:auto">
   <table class="grid-table">
     <thead>
@@ -50,19 +45,17 @@
     </tbody>
   </table>
 </div>
-{% endif %}
 {% endmacro %}
 
 <div class="section">
   <div class="card pad-lg">
     <div class="card-head">
-      <h2>Node &amp; border certificates</h2>
-      <span class="subhead">TLS certificates each CUCM node (8443 Tomcat, 5061
-        CallManager, 2443 CAPF) and each CUBE / SBC serves, read with a plain
-        handshake — read-only, no CUCM API.{% if last_checked %} Last checked {{ last_checked | fdt }}.{% endif %}</span>
+      <h2>Certificates</h2>
+      <span class="subhead">TLS certificates each CUCM node and CUBE / SBC serves,
+        read with a plain handshake — read-only, no CUCM API.{% if last_checked %} Last checked {{ last_checked | fdt }}.{% endif %}</span>
     </div>
 
-    <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:14px">
+    <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:16px">
       <form method="post" action="/certificates/check">
         <button class="btn btn-primary" type="submit">Check certificates</button>
       </form>
@@ -75,73 +68,113 @@
       {% endif %}
     </div>
 
-    {% if not certs %}
-    <div class="empty">
-      <h2>No certificates checked yet</h2>
-      <p>Add any CUBEs below, then click <strong>Check certificates</strong>. Voxa
-        opens a TLS socket to each CUCM node and CUBE and reads what it serves —
-        nothing is written. Hosts it can't route to over the VPN show as unreachable.</p>
-    </div>
-    {% else %}
-    {{ cert_table("CUCM nodes", "publisher, subscribers, IM&P — discovered from the cluster", cucm_certs) }}
-    {{ cert_table("CUBEs / border elements", "operator-added SIP border elements and gateways", cube_certs) }}
-    <div class="subhead" style="margin-top:12px">
-      Hover a subject for its SAN, or a failure for the raw error.
-      <strong>DNS</strong> = the host name didn't resolve (environmental — fixed
-      by internal DNS on the VM); <strong>no response / port closed</strong> = the
-      host was reached but that service isn't answering (e.g. CAPF isn't on an
-      IM&amp;P node, or a CUBE without an HTTPS management interface on 8443).
-    </div>
-    {% endif %}
-  </div>
+    {# CSS-only segmented toggle. Radios precede the tabs + panes so the general
+       sibling combinator can show the selected pane. Server seeds the initial
+       tab from ?view= so returning from add/remove lands on Border. #}
+    <input type="radio" name="certview" id="cv-nodes" class="cv-radio" {{ 'checked' if view != 'border' }}>
+    <input type="radio" name="certview" id="cv-border" class="cv-radio" {{ 'checked' if view == 'border' }}>
 
-  <div class="card pad-lg">
-    <div class="card-head">
-      <h2>CUBEs &amp; border elements</h2>
-      <span class="subhead">TLS endpoints to include in the check. CUCM nodes are
-        found automatically; add CUBEs / SBCs here since they aren't in CUCM.</span>
+    <div class="cert-seg" role="tablist">
+      <label for="cv-nodes">Node certs <b class="tnum">{{ cucm_certs | length }}</b></label>
+      <label for="cv-border">Border certs <b class="tnum">{{ cube_certs | length }}</b></label>
     </div>
 
-    {% if cert_targets %}
-    <div style="overflow-x:auto">
-      <table class="grid-table">
-        <thead>
-          <tr><th>Host</th><th>Label</th><th>Ports</th><th></th></tr>
-        </thead>
-        <tbody>
-          {% for t in cert_targets %}
-          <tr>
-            <td class="mono">{{ t.host }}</td>
-            <td>{{ t.label or "—" }}</td>
-            <td class="mono">{{ t.ports }}</td>
-            <td style="text-align:right">
-              <form method="post" action="/certificates/targets/{{ t.id }}/delete" style="display:inline">
-                <button class="btn btn-secondary" type="submit"
-                        style="min-height:28px;padding:0 10px;font-size:12px">Remove</button>
-              </form>
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
+    <div class="cv-pane cv-nodes-pane">
+      {% if cucm_certs %}
+      {{ cert_table(cucm_certs) }}
+      {% else %}
+      <div class="empty">
+        <h2>No node certificates yet</h2>
+        <p>Click <strong>Check certificates</strong>. Voxa opens a TLS socket to
+          each CUCM node (8443 Tomcat, 5061 CallManager, 2443 CAPF) and reads what
+          it serves — nothing is written. Nodes it can't route to over the VPN show
+          as unreachable.</p>
+      </div>
+      {% endif %}
+      <div class="subhead" style="margin-top:12px">
+        <strong>DNS</strong> = the node name didn't resolve (environmental — fixed
+        by internal DNS on the VM); <strong>no response / port closed</strong> = the
+        host was reached but that service isn't answering (e.g. CAPF isn't on an
+        IM&amp;P node). Certs not served on a socket (e.g. ITLRecovery) need the
+        CUCM PAWS API and aren't shown.
+      </div>
     </div>
-    {% else %}
-    <div class="subhead" style="margin-bottom:12px">No CUBEs added yet.</div>
-    {% endif %}
 
-    <form method="post" action="/certificates/targets" class="cube-add">
-      <input class="filter-select" type="text" name="host" required
-             placeholder="cube1.corp.example.com or 10.0.20.5" style="min-width:260px">
-      <input class="filter-select" type="text" name="label"
-             placeholder="Label — e.g. HQ CUBE" style="min-width:180px">
-      <input class="filter-select" type="text" name="ports" value="5061,8443"
-             title="Comma-separated TLS ports" style="width:120px">
-      <button class="btn btn-primary" type="submit">Add CUBE</button>
-    </form>
-    <div class="subhead" style="margin-top:10px">
-      <strong>5061</strong> is the SIP-TLS cert on a secure trunk (its expiry
-      drops the trunk); <strong>8443</strong> is the IOS-XE HTTPS management /
-      RESTCONF cert. Edit ports per CUBE — re-adding the same host updates it.
+    <div class="cv-pane cv-border-pane">
+      {% if cube_certs %}
+      {{ cert_table(cube_certs) }}
+      {% elif cert_targets %}
+      <div class="subhead" style="margin:4px 0 14px">
+        {{ cert_targets | length }} CUBE{{ '' if cert_targets|length == 1 else 's' }} added — click
+        <strong>Check certificates</strong> to read them.
+      </div>
+      {% endif %}
+
+      <div class="cert-manage">
+        <div class="card-head" style="margin-bottom:10px">
+          <h2>Manage CUBEs</h2>
+          <span class="subhead">border elements to include in the check — added
+            here since a CUBE isn't in CUCM's node list.</span>
+        </div>
+
+        {% if cert_targets %}
+        <div style="overflow-x:auto">
+          <table class="grid-table">
+            <thead>
+              <tr><th>Host</th><th>Label</th><th>Ports</th><th>Last check</th><th></th></tr>
+            </thead>
+            <tbody>
+              {% for t in cert_targets %}
+              {% set probes = cube_certs | selectattr('host', 'equalto', t.host) | list %}
+              <tr>
+                <td class="mono">{{ t.host }}</td>
+                <td>{{ t.label or "—" }}</td>
+                <td class="mono">{{ t.ports }}</td>
+                <td>
+                  {% if probes %}
+                  <div class="probe-chips">
+                    {% for p in probes %}
+                      {% if p.error %}{% set pf = p.error | cert_fail %}
+                      <span class="pill {{ pf.pill }}" title="{{ p.error }}">:{{ p.port }} {{ pf.label }}</span>
+                      {% else %}
+                      <span class="pill current" title="valid to {{ p.valid_to | fdate }}">:{{ p.port }} OK</span>
+                      {% endif %}
+                    {% endfor %}
+                  </div>
+                  {% else %}
+                  <span class="desc" style="color:var(--ink-3)">not checked yet</span>
+                  {% endif %}
+                </td>
+                <td style="text-align:right">
+                  <form method="post" action="/certificates/targets/{{ t.id }}/delete" style="display:inline">
+                    <button class="btn btn-secondary" type="submit"
+                            style="min-height:28px;padding:0 10px;font-size:12px">Remove</button>
+                  </form>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <div class="subhead" style="margin-bottom:12px">No CUBEs added yet.</div>
+        {% endif %}
+
+        <form method="post" action="/certificates/targets" class="cube-add" style="margin-top:12px">
+          <input class="filter-select" type="text" name="host" required
+                 placeholder="cube1.corp.example.com or 10.0.20.5" style="min-width:260px">
+          <input class="filter-select" type="text" name="label"
+                 placeholder="Label — e.g. HQ CUBE" style="min-width:180px">
+          <input class="filter-select" type="text" name="ports" value="5061,8443"
+                 title="Comma-separated TLS ports" style="width:120px">
+          <button class="btn btn-primary" type="submit">Add CUBE</button>
+        </form>
+        <div class="subhead" style="margin-top:10px">
+          <strong>5061</strong> is the SIP-TLS cert on a secure trunk (its expiry
+          drops the trunk); <strong>8443</strong> is the IOS-XE HTTPS management /
+          RESTCONF cert. Edit ports per CUBE — re-adding the same host updates it.
+        </div>
+      </div>
     </div>
   </div>
 </div>

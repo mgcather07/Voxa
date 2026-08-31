@@ -1048,6 +1048,7 @@ async def catalog_save(
 @app.get("/certificates", response_class=HTMLResponse)
 def certificates_page(
     request: Request,
+    view: str = "nodes",
     session: Session = Depends(get_session),
     user: User = Depends(require_admin),
 ):
@@ -1079,6 +1080,7 @@ def certificates_page(
         _ctx(request, session, user, certs=cert_rows,
              cucm_certs=cucm_certs, cube_certs=cube_certs,
              cert_targets=cert_targets, last_checked=last,
+             view=("border" if view == "border" else "nodes"),
              expired=expired, expiring=expiring, dns_fail=dns_fail, no_resp=no_resp),
     )
 
@@ -1107,7 +1109,7 @@ def certificates_add_target(
             existing.enabled = True
         session.commit()
         log.info("Cert target added/updated by %s: %s", user.username, host)
-    return RedirectResponse(url="/certificates", status_code=303)
+    return RedirectResponse(url="/certificates?view=border", status_code=303)
 
 
 @app.post("/certificates/targets/{target_id}/delete")
@@ -1121,7 +1123,7 @@ def certificates_delete_target(
         session.delete(t)
         session.commit()
         log.info("Cert target removed by %s: %s", user.username, t.host)
-    return RedirectResponse(url="/certificates", status_code=303)
+    return RedirectResponse(url="/certificates?view=border", status_code=303)
 
 
 @app.post("/certificates/check")
