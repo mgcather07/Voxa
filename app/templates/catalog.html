@@ -50,7 +50,7 @@
                 <input type="hidden" name="model_key" value="{{ r.key }}">{{ r.key }}
               </td>
               <td class="desc">{{ r.model_raw }}</td>
-              <td class="num">{{ r.count }}</td>
+              <td class="num">{{ r.count | comma }}</td>
               <td>
                 <select class="filter-select" name="poe_class__{{ r.key }}">
                   {% for c, watts in poe_classes %}

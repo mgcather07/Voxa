@@ -30,12 +30,12 @@
             <span class="name">{{ r.name }}</span>
             <span class="spec">{{ r.key }} · class {{ r.poe_class }} · {{ "%.2f"|format(r.poe_watts) }} W</span>
           </div>
-          <div class="qty"><b class="tnum">{{ r.count }}</b><span>units</span></div>
+          <div class="qty"><b class="tnum">{{ r.count | comma }}</b><span>units</span></div>
         </div>
         {% endfor %}
         <div class="buy-total">
           <span class="uplabel">Total to order</span>
-          <span class="sum tnum">{{ plan.total_count }}</span>
+          <span class="sum tnum">{{ plan.total_count | comma }}</span>
         </div>
       {% endif %}
     </div>
@@ -49,13 +49,13 @@
       <div class="plan-site">
         <div class="top">
           <span class="name">{{ s.site }}</span>
-          <span class="total tnum">{{ s.total }}</span>
+          <span class="total tnum">{{ s.total | comma }}</span>
         </div>
         {% for l in s.lines %}
         <div class="plan-line">
           <span class="name">{{ l.name }}</span>
           <div class="track"><span class="barc-{{ loop.index0 % 4 }}" style="width: {{ l.pct }}%"></span></div>
-          <span class="count tnum">{{ l.count }}</span>
+          <span class="count tnum">{{ l.count | comma }}</span>
         </div>
         {% endfor %}
       </div>
@@ -73,7 +73,7 @@
       <div class="map-card">
         <div class="left">
           <span class="key">{{ m.key }}</span>
-          <span class="meta">{{ m.count }} in service · {{ m.spec }}</span>
+          <span class="meta">{{ m.count | comma }} in service · {{ m.spec }}</span>
         </div>
         <svg width="16" height="16" viewBox="0 0 24 24" fill="var(--ink-3)" aria-hidden="true"><path d="M13 5l7 7-7 7-1.4-1.4 4.6-4.6H4v-2h12.2l-4.6-4.6L13 5Z"/></svg>
         <div class="right">

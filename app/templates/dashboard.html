@@ -25,11 +25,11 @@
   {"label": "End of sale", "value": summary.eos, "unit": eos_pct ~ "%", "color": "var(--orange)", "bar": eos_pct,
    "note": "plan the next budget cycle"},
   {"label": "Registered", "value": summary.registered, "unit": reg_pct ~ "%", "color": "var(--green)", "bar": reg_pct,
-   "note": summary.unregistered ~ " not registered right now"},
+   "note": (summary.unregistered | comma) ~ " not registered right now"},
   {"label": "Serial captured", "value": summary.serial_coverage ~ "%", "unit": "", "color": "var(--cyan)", "bar": summary.serial_coverage,
-   "note": summary.with_serial ~ " of " ~ summary.total ~ " phones answered"},
+   "note": (summary.with_serial | comma) ~ " of " ~ (summary.total | comma) ~ " phones answered"},
   {"label": "Switch port known", "value": summary.port_coverage ~ "%", "unit": "", "color": "var(--blue)", "bar": summary.port_coverage,
-   "note": summary.with_switch_port ~ " CDP neighbours resolved"}
+   "note": (summary.with_switch_port | comma) ~ " CDP neighbours resolved"}
 ] %}
 
 <div class="tiles">
@@ -37,7 +37,7 @@
   <div class="tile">
     <div class="label">{{ t.label }}</div>
     <div class="value-row">
-      <span class="value tnum" style="color: {{ t.color }}">{{ t.value }}</span>
+      <span class="value tnum" style="color: {{ t.color }}">{{ t.value | comma }}</span>
       {% if t.unit %}<span class="unit">{{ t.unit }}</span>{% endif %}
     </div>
     <div class="progress"><span style="width: {{ t.bar }}%; background: {{ t.color }}"></span></div>
@@ -68,7 +68,7 @@
   <div class="callrow">
     {% for c in clusters %}
     <div class="callstat">
-      <span class="cs-value tnum">{{ c.total }}</span>
+      <span class="cs-value tnum">{{ c.total | comma }}</span>
       <span class="cs-label"><a href="/phones?cluster={{ c.cluster }}">{{ c.cluster }}</a></span>
     </div>
     {% endfor %}
@@ -85,10 +85,10 @@
   <div class="callrow">
     <div class="callstat">
       <span class="cs-value tnum">{{ "{:,}".format(call_activity.total_calls) }}</span>
-      <span class="cs-label">calls across {{ call_activity.active }} phones</span>
+      <span class="cs-label">calls across {{ call_activity.active | comma }} phones</span>
     </div>
     <div class="callstat">
-      <span class="cs-value tnum" style="color:var(--orange)">{{ call_activity.unused }}</span>
+      <span class="cs-value tnum" style="color:var(--orange)">{{ call_activity.unused | comma }}</span>
       <span class="cs-label">unused ({{ call_activity.unused_pct }}%) — retire, don't replace</span>
     </div>
     <div class="callstat">
@@ -114,7 +114,7 @@
         <a href="/phones?model={{ m.model_key }}">{{ m.model_raw or m.model_key }}</a>{% if not m.verified %}<span class="unv" title="Catalog entry unverified"> °</span>{% endif %}
       </div>
       <div><span class="pill {{ m.lifecycle }}">{{ m.lifecycle }}</span></div>
-      <div class="count">{{ m.count }}</div>
+      <div class="count">{{ m.count | comma }}</div>
       <div class="rep">{{ m.replacement_name or "—" }}</div>
     </div>
     {% endfor %}
@@ -132,7 +132,7 @@
     <div class="site-row">
       <div class="top">
         <a class="name" href="/phones?site={{ s.site }}">{{ s.site }}</a>
-        <span class="total tnum">{{ s.total }}</span>
+        <span class="total tnum">{{ s.total | comma }}</span>
         <span class="phones">phones</span>
       </div>
       <div class="stacked">
@@ -141,8 +141,8 @@
         <i class="cur" style="width: {{ curW }}%"></i>
       </div>
       <div class="legend">
-        <span><b class="eol">{{ s.eol }}</b> past support</span>
-        <span><b class="eos">{{ s.eos }}</b> end of sale</span>
+        <span><b class="eol">{{ s.eol | comma }}</b> past support</span>
+        <span><b class="eos">{{ s.eos | comma }}</b> end of sale</span>
         <span class="reg">{{ s.reg_pct }}% registered</span>
       </div>
     </div>

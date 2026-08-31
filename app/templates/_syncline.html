@@ -1,9 +1,9 @@
 {% if not latest_run %}
   <span class="dot"></span><span>No collection yet &mdash; click Collect from CUCM.</span>
 {% elif latest_run.status == "running" %}
-  <span class="dot busy"></span><span>Collecting &mdash; {{ latest_run.stage or "querying AXL" }} · {{ latest_run.ris_count }} seen live, reading phone web services</span>
+  <span class="dot busy"></span><span>Collecting &mdash; {{ latest_run.stage or "querying AXL" }} · {{ latest_run.ris_count | comma }} seen live, reading phone web services</span>
 {% elif latest_run.status == "failed" %}
   <span class="dot fail"></span><span>Last collection failed: {{ latest_run.error or "unknown error" }}</span>
 {% else %}
-  <span class="dot"></span><span>Last collection {{ latest_run.finished_at | timeago }} · {{ latest_run.axl_count }} phones · AXL, RisPort and phone web all answered</span>
+  <span class="dot"></span><span>Last collection {{ latest_run.finished_at | timeago }} · {{ latest_run.axl_count | comma }} phones · AXL, RisPort and phone web all answered</span>
 {% endif %}

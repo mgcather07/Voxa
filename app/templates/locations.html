@@ -8,7 +8,7 @@
   <div class="tiles">
     <div class="tile">
       <div class="label">Locations</div>
-      <div class="value-row"><span class="value tnum">{{ entries|length }}</span></div>
+      <div class="value-row"><span class="value tnum">{{ entries|length | comma }}</span></div>
       <div class="note">defined dispatchable locations</div>
     </div>
     <div class="tile">
@@ -17,7 +17,7 @@
         <span class="value tnum" style="color:var(--cyan)">{{ coverage.pct }}%</span>
       </div>
       <div class="progress"><span style="width: {{ coverage.pct }}%; background: var(--cyan)"></span></div>
-      <div class="note">{{ coverage.resolved }} of {{ coverage.total }} resolve to a location</div>
+      <div class="note">{{ coverage.resolved | comma }} of {{ coverage.total | comma }} resolve to a location</div>
     </div>
     <div class="tile" style="justify-content:space-between">
       <div class="label">E911 record</div>
@@ -51,7 +51,7 @@
     <div class="card-head">
       <h2>{{ e.location.name }}</h2>
       <span class="subhead">{{ e.location.address or "no address" }}</span>
-      <span class="loc-count tnum">{{ e.phone_count }} phones</span>
+      <span class="loc-count tnum">{{ e.phone_count | comma }} phones</span>
       <form method="post" action="/locations/{{ e.location.id }}/delete"
             onsubmit="return confirm('Delete this location and its rules?')">
         <button class="linkbtn danger" type="submit">Delete</button>

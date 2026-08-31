@@ -6,7 +6,7 @@
 {% macro change_list(title, items, tone) %}
 {% if items %}
 <div class="change-block">
-  <div class="change-head"><span class="dot {{ tone }}"></span>{{ title }} <span class="n tnum">{{ items|length }}</span></div>
+  <div class="change-head"><span class="dot {{ tone }}"></span>{{ title }} <span class="n tnum">{{ items|length | comma }}</span></div>
   <div class="change-rows">
     {% for name in items[:60] %}
     <a class="change-row" href="/phones?q={{ name }}"><span class="mono">{{ name }}</span></a>
@@ -20,7 +20,7 @@
 {% macro change_pairs(title, items, tone) %}
 {% if items %}
 <div class="change-block">
-  <div class="change-head"><span class="dot {{ tone }}"></span>{{ title }} <span class="n tnum">{{ items|length }}</span></div>
+  <div class="change-head"><span class="dot {{ tone }}"></span>{{ title }} <span class="n tnum">{{ items|length | comma }}</span></div>
   <div class="change-rows">
     {% for it in items[:60] %}
     <a class="change-row pair" href="/phones?q={{ it.device }}">
@@ -56,11 +56,11 @@
     <div class="trend">
       {% set tmax = (trend | map(attribute='total') | max) or 1 %}
       {% for t in trend %}
-      <div class="trend-col" title="{{ t.total }} phones · {{ t.registered_pct }}% registered">
+      <div class="trend-col" title="{{ t.total | comma }} phones · {{ t.registered_pct }}% registered">
         <div class="trend-bar">
           <div class="fill" style="height: {{ (100 * t.total / tmax) | round | int }}%"></div>
         </div>
-        <div class="trend-n tnum">{{ t.total }}</div>
+        <div class="trend-n tnum">{{ t.total | comma }}</div>
         <div class="trend-day">{{ t.run.finished_at.strftime("%m/%d") if t.run.finished_at }}</div>
       </div>
       {% endfor %}

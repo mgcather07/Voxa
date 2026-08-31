@@ -3,7 +3,7 @@
 {% block page_title %}Phone inventory{% endblock %}
 {% block content %}
 
-{% set match_line = (total ~ " phones") if match_count == total else (match_count ~ " of " ~ total ~ " match") %}
+{% set match_line = ((total | comma) ~ " phones") if match_count == total else ((match_count | comma) ~ " of " ~ (total | comma) ~ " match") %}
 
 <div class="card">
   <form class="filters"

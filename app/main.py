@@ -84,6 +84,21 @@ BASE_DIR = Path(__file__).resolve().parent
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 
 
+def _comma(value):
+    """Thousands separators for display: 1742 -> '1,742'. A no-op below 1000 and
+    for anything non-numeric, so it is safe to apply to any integer count."""
+    if isinstance(value, bool) or value is None:
+        return value
+    if isinstance(value, int):
+        return f"{value:,}"
+    if isinstance(value, float):
+        return f"{value:,.2f}"
+    return value
+
+
+templates.env.filters["comma"] = _comma
+
+
 def _timeago(value) -> str:
     """Human 'x ago' for the top-bar collection status line."""
     if value is None:

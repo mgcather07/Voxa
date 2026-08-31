@@ -32,7 +32,7 @@
       </a>
       <a class="nav-item {{ 'on' if path == '/phones' }}" href="/phones">
         <span class="bar"></span>Phones
-        <span class="count tnum">{{ fleet_total }}</span>
+        <span class="count tnum">{{ fleet_total | comma }}</span>
       </a>
       <a class="nav-item {{ 'on' if path == '/history' }}" href="/history">
         <span class="bar"></span>History

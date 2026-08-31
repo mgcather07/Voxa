@@ -14,13 +14,13 @@
 <div class="section">
   <div class="tiles">
     <div class="tile"><div class="label">Peak concurrent</div>
-      <div class="value-row"><span class="value tnum" style="color:var(--cyan)">{{ cap.peak }}</span><span class="unit">calls</span></div>
+      <div class="value-row"><span class="value tnum" style="color:var(--cyan)">{{ cap.peak | comma }}</span><span class="unit">calls</span></div>
       <div class="note">{{ cap.peak_at.strftime("%Y-%m-%d %H:%M") if cap.peak_at else "" }}</div></div>
     <div class="tile"><div class="label">Traffic</div>
-      <div class="value-row"><span class="value tnum">{{ cap.erlangs }}</span><span class="unit">Erlangs</span></div>
+      <div class="value-row"><span class="value tnum">{{ cap.erlangs | comma }}</span><span class="unit">Erlangs</span></div>
       <div class="note">avg simultaneous calls over the range</div></div>
     <div class="tile"><div class="label">Busy-hour call attempts</div>
-      <div class="value-row"><span class="value tnum">{{ cap.bhca }}</span></div>
+      <div class="value-row"><span class="value tnum">{{ cap.bhca | comma }}</span></div>
       <div class="note">most calls started in any 60 min</div></div>
   </div>
 
@@ -35,7 +35,7 @@
       </div>
       {% endfor %}
     </div>
-    <div class="trend-legend"><span>Range peak: <b class="tnum">{{ cap.peak }}</b> concurrent calls</span></div>
+    <div class="trend-legend"><span>Range peak: <b class="tnum">{{ cap.peak | comma }}</b> concurrent calls</span></div>
   </div>
 
   <div class="card">
@@ -49,9 +49,9 @@
           {% for g in cap.gateways %}
           <tr>
             <td class="device">{{ g.name }}</td>
-            <td class="num tnum">{{ g.peak }}</td>
-            <td class="num tnum">{{ g.erlangs }}</td>
-            <td class="num tnum">{{ g.minutes }}</td>
+            <td class="num tnum">{{ g.peak | comma }}</td>
+            <td class="num tnum">{{ g.erlangs | comma }}</td>
+            <td class="num tnum">{{ g.minutes | comma }}</td>
             <td>
               <form method="post" action="/capacity/channels" style="display:flex;gap:6px;align-items:center">
                 <input type="hidden" name="gateway" value="{{ g.name }}">
