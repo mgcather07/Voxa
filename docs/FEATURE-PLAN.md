@@ -115,6 +115,7 @@ Voxa. This wave stores raw CDR/CMR records (not just the Phase-5 aggregates).
 - ✅ Quality distribution (MOS buckets), disconnect-cause breakdown
 - ✅ Missed-call summary (answered % / missed %), fleet avg MOS
 
-## Phase 10 — Gateway / trunk health & CUCM insight  ⬜
-- ⬜ Gateway/trunk call volume + utilization from CDR
-- ⬜ CUCM configuration insight surface (read-only)
+## Phase 10 — Gateway / trunk health & quality issues  ✅
+- ✅ Gateway/trunk call volume + minutes from CDR (external calls route through
+     named gateways); searchable on `/calls`
+- ✅ Quality-issues panel: worst-MOS legs, each linking straight to its trace

@@ -26,8 +26,42 @@ def _legs(session: Session):
             CallRecord.final_called,
             CallRecord.duration,
             CallRecord.dest_cause,
+            CallRecord.orig_device,
+            CallRecord.dest_device,
         )
     ).all()
+
+
+def _is_gateway(device: str | None) -> bool:
+    """A device that isn't a phone (SEP…) and isn't empty — a gateway/trunk."""
+    return bool(device) and not device.startswith("SEP")
+
+
+def quality_issues(session: Session, limit: int = 12) -> list[dict]:
+    """Worst-MOS legs, each linked back to its call for a one-click trace."""
+    bad = session.execute(
+        select(CallQuality).where(CallQuality.mos.is_not(None),
+                                  CallQuality.mos < 3.6)
+        .order_by(CallQuality.mos.asc()).limit(limit)
+    ).scalars().all()
+    out = []
+    for cq in bad:
+        rec = session.scalars(
+            select(CallRecord).where(
+                (CallRecord.orig_leg_id == cq.leg_id)
+                | (CallRecord.dest_leg_id == cq.leg_id)
+            ).limit(1)
+        ).first()
+        out.append({
+            "device": cq.device,
+            "mos": cq.mos,
+            "jitter_ms": cq.jitter_ms,
+            "latency_ms": cq.latency_ms,
+            "loss_pct": cq.loss_pct,
+            "call_key": rec.call_key if rec else None,
+            "when": rec.orig_time if rec else None,
+        })
+    return out
 
 
 def overview(session: Session) -> dict:
@@ -40,10 +74,12 @@ def overview(session: Session) -> dict:
     by_hour = {h: 0 for h in range(24)}
     talkers: Counter = Counter()
     causes: Counter = Counter()
+    gw_calls: Counter = Counter()
+    gw_seconds: Counter = Counter()
     missed = 0
     total = 0
 
-    for orig_time, calling, called, duration, dest_cause in rows:
+    for orig_time, calling, called, duration, dest_cause, orig_dev, dest_dev in rows:
         total += 1
         answered = (duration or 0) > 0
         if not answered:
@@ -52,6 +88,10 @@ def overview(session: Session) -> dict:
                 causes[int(dest_cause)] += 1
         if calling:
             talkers[calling] += 1
+        for dev in (orig_dev, dest_dev):
+            if _is_gateway(dev):
+                gw_calls[dev] += 1
+                gw_seconds[dev] += duration or 0
         if orig_time is not None:
             d = orig_time.date()
             if d in by_day:
@@ -116,5 +156,11 @@ def overview(session: Session) -> dict:
             {"cause": code, "label": cause_label(code), "count": n}
             for code, n in causes.most_common(8)
         ],
+        "gateways": [
+            {"name": gw, "calls": n, "minutes": round(gw_seconds[gw] / 60)}
+            for gw, n in gw_calls.most_common(10)
+        ],
+        "gateway_max": gw_calls.most_common(1)[0][1] if gw_calls else 1,
+        "quality_issues": quality_issues(session),
         "has_data": total > 0,
     }

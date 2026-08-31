@@ -87,6 +87,36 @@
       {% endfor %}
     </div>
   </div>
+
+  {% if a.gateways %}
+  <div class="grid dash-two">
+    <div class="card">
+      <div class="card-head"><h2>Gateways &amp; trunks</h2><span class="subhead">PSTN call volume through each</span></div>
+      {% for g in a.gateways %}
+      <div class="plan-line" style="padding:8px 0">
+        <span class="name mono" style="min-width:150px">{{ g.name }}</span>
+        <div class="track"><span class="barc-2" style="width:{{ (100 * g.calls / a.gateway_max) | round | int }}%"></span></div>
+        <span class="count tnum" title="{{ g.minutes }} min">{{ g.calls }}</span>
+      </div>
+      {% endfor %}
+      <div class="footnote"><span>Volume and minutes of external calls routed through each gateway / SIP trunk.</span></div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h2>Quality issues</h2><span class="subhead">worst-MOS legs — click to trace</span></div>
+      {% if not a.quality_issues %}
+      <div class="muted" style="font-size:12.5px">No poor-quality calls. Nice.</div>
+      {% endif %}
+      {% for qi in a.quality_issues %}
+      <a class="change-row pair" href="/calls/{{ qi.call_key }}" style="grid-template-columns:minmax(0,1.4fr) 52px 1fr">
+        <span class="mono dev">{{ qi.device or "—" }}</span>
+        <span class="now" style="color:{{ 'var(--red)' if qi.mos < 3.3 else 'var(--orange)' }}">MOS {{ qi.mos }}</span>
+        <span class="was">{{ qi.loss_pct }}% loss · {{ qi.jitter_ms }}ms jitter</span>
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
 </div>
 
 {% endif %}

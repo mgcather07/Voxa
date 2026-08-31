@@ -47,6 +47,13 @@ SITE_CLUSTER = {
     "PLANT2": "cucm-west", "WAREHOUSE": "cucm-west", "REMOTE": "cucm-west",
 }
 
+# PSTN gateways / SIP trunks per cluster — external calls route through these,
+# so the gateway/trunk analytics have something to show.
+GATEWAYS = {
+    "cucm-east": ["HQ-PSTN-GW", "HQ-SIP-TRUNK"],
+    "cucm-west": ["PLANT-PSTN-GW"],
+}
+
 # Weighted toward a realistic aging fleet: mostly 7900s, some 8800s.
 MODEL_MIX = [
     ("Cisco 7962", 26), ("Cisco 7942", 18), ("Cisco 7965", 9),
@@ -277,8 +284,10 @@ def _seed_calls(session, phones: list[Phone], now: datetime) -> None:
                 callee.directory_number, callee.device_name, callee.ip_address
             )
         else:
-            callee, callee_dev, callee_ip = None, None, None
+            # External call — routed out through a PSTN gateway / SIP trunk.
+            callee, callee_ip = None, None
             callee_num = random.choice(externals)
+            callee_dev = random.choice(GATEWAYS[caller.cluster])
         cmid = 1 if caller.cluster == "cucm-east" else 2
 
         start = now - timedelta(
