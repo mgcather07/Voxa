@@ -158,6 +158,7 @@ def run_sync(settings: Settings | None = None) -> int:
                 elif web is not None:
                     phone.web_reachable = False
 
+                phone.cluster = settings.cluster_name
                 phone.model_key = info.key
                 phone.family = info.family
                 phone.generation = info.generation

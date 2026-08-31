@@ -49,6 +49,7 @@ class Phone(Base):
     protocol: Mapped[str | None] = mapped_column(String(32))
     device_pool: Mapped[str | None] = mapped_column(String(128), index=True)
     site: Mapped[str | None] = mapped_column(String(128), index=True)
+    cluster: Mapped[str | None] = mapped_column(String(64), index=True)
     configured_load: Mapped[str | None] = mapped_column(String(128))
     directory_number: Mapped[str | None] = mapped_column(String(64), index=True)
 

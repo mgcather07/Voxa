@@ -290,6 +290,19 @@ def poe_by_switch(session: Session, family: str = DEFAULT_FAMILY) -> list[dict]:
     return out
 
 
+def clusters(session: Session) -> list[dict]:
+    """Phone count per cluster — only interesting once more than one exists."""
+    rows = session.execute(
+        select(Phone.cluster, func.count().label("total"))
+        .group_by(Phone.cluster)
+        .order_by(func.count().desc())
+    ).all()
+    return [
+        {"cluster": cluster or "unassigned", "total": total}
+        for cluster, total in rows
+    ]
+
+
 def call_activity(session: Session) -> dict:
     """Fleet call-activity summary from CallStat. Powers the "which phones does
     nobody use, so don't replace them" question and a rough fleet MOS."""

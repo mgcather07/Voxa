@@ -210,6 +210,7 @@ def dashboard(
             sites=reports.by_site(session),
             unverified=reports.unverified_models(session),
             call_activity=reports.call_activity(session),
+            clusters=reports.clusters(session),
         ),
     )
 
@@ -227,8 +228,11 @@ def _phone_conditions(
     life: list[str],
     status: str,
     swap: str,
+    cluster: str = "",
 ) -> list:
     conditions = []
+    if cluster:
+        conditions.append(Phone.cluster == cluster)
     if q:
         needle = f"%{q.strip()}%"
         conditions.append(
@@ -262,9 +266,10 @@ def _phone_results(
     life: list[str] | None = None,
     status: str = "",
     swap: str = "",
+    cluster: str = "",
 ) -> dict:
     """Capped rows plus the true (uncapped) match count for the header line."""
-    conditions = _phone_conditions(q, site, model, life or [], status, swap)
+    conditions = _phone_conditions(q, site, model, life or [], status, swap, cluster)
 
     match_count = session.scalar(
         select(func.count()).select_from(Phone).where(*conditions)
@@ -282,6 +287,12 @@ def _phone_results(
     }
 
 
+def _all_clusters(session: Session) -> list[str]:
+    return sorted(
+        c for c in session.scalars(select(Phone.cluster).distinct()).all() if c
+    )
+
+
 @app.get("/phones", response_class=HTMLResponse)
 def phones_page(
     request: Request,
@@ -291,10 +302,11 @@ def phones_page(
     life: list[str] = Query(default=[]),
     status: str = "",
     swap: str = "",
+    cluster: str = "",
     session: Session = Depends(get_session),
     user: User = Depends(require_user),
 ):
-    result = _phone_results(session, q, site, model, life, status, swap)
+    result = _phone_results(session, q, site, model, life, status, swap, cluster)
     return templates.TemplateResponse(
         "phones.html",
         _ctx(
@@ -308,7 +320,9 @@ def phones_page(
                 "life": life,
                 "status": status,
                 "swap": swap,
+                "cluster": cluster,
             },
+            all_clusters=_all_clusters(session),
             **result,
         ),
     )
@@ -323,11 +337,12 @@ def phones_rows(
     life: list[str] = Query(default=[]),
     status: str = "",
     swap: str = "",
+    cluster: str = "",
     session: Session = Depends(get_session),
     user: User = Depends(require_user),
 ):
     """HTMX partial - the table body plus the out-of-band header counts."""
-    result = _phone_results(session, q, site, model, life, status, swap)
+    result = _phone_results(session, q, site, model, life, status, swap, cluster)
     return templates.TemplateResponse(
         "_phone_rows.html",
         {"request": request, "swap_statuses": SWAP_STATUSES, "oob": True, **result},

@@ -22,6 +22,12 @@
       <label class="chip eos"><input type="checkbox" name="life" value="eos" {{ 'checked' if 'eos' in filters.life }}>End of sale</label>
       <label class="chip current"><input type="checkbox" name="life" value="current" {{ 'checked' if 'current' in filters.life }}>Current</label>
     </div>
+    {% if all_clusters|length > 1 %}
+    <select class="filter-select" name="cluster">
+      <option value="">All clusters</option>
+      {% for cl in all_clusters %}<option value="{{ cl }}" {{ 'selected' if filters.cluster == cl }}>{{ cl }}</option>{% endfor %}
+    </select>
+    {% elif filters.cluster %}<input type="hidden" name="cluster" value="{{ filters.cluster }}">{% endif %}
     {% if filters.site %}<input type="hidden" name="site" value="{{ filters.site }}">{% endif %}
     {% if filters.model %}<input type="hidden" name="model" value="{{ filters.model }}">{% endif %}
     {% if filters.status %}<input type="hidden" name="status" value="{{ filters.status }}">{% endif %}

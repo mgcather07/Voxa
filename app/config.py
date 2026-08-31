@@ -18,6 +18,10 @@ class Settings(BaseSettings):
     cucm_password: str = ""
     cucm_axl_version: str = "12.5"
     cucm_verify_tls: bool = False
+    # Label for the cluster this instance collects from. Multi-cluster is
+    # supported by running the collector once per cluster, each with its own
+    # CUCM_* env and a distinct CLUSTER_NAME; every phone is tagged with it.
+    cluster_name: str = "default"
 
     # Phone web scraping
     phone_web_enabled: bool = True

@@ -38,6 +38,12 @@ SITES = {
     "REMOTE": ("DP_REMOTE_01", 3),
 }
 
+# Two clusters, so the multi-cluster UI has something to show.
+SITE_CLUSTER = {
+    "HQ": "cucm-east", "PLANT1": "cucm-east",
+    "PLANT2": "cucm-west", "WAREHOUSE": "cucm-west", "REMOTE": "cucm-west",
+}
+
 # Weighted toward a realistic aging fleet: mostly 7900s, some 8800s.
 MODEL_MIX = [
     ("Cisco 7962", 26), ("Cisco 7942", 18), ("Cisco 7965", 9),
@@ -129,6 +135,7 @@ def main() -> None:
                 protocol=random.choice(["SCCP", "SIP"]),
                 device_pool=device_pool,
                 site=site,
+                cluster=SITE_CLUSTER.get(site, "cucm-east"),
                 configured_load=firmware_for(model_raw),
                 directory_number=str(dn_base + i),
                 registration_status="Registered" if registered else "UnRegistered",

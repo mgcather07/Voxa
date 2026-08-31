@@ -58,6 +58,23 @@
 </div>
 {% endif %}
 
+{% if clusters|length > 1 %}
+<div class="card">
+  <div class="card-head">
+    <h2>Clusters</h2>
+    <span class="subhead">devices per CUCM cluster</span>
+  </div>
+  <div class="callrow">
+    {% for c in clusters %}
+    <div class="callstat">
+      <span class="cs-value tnum">{{ c.total }}</span>
+      <span class="cs-label"><a href="/phones?cluster={{ c.cluster }}">{{ c.cluster }}</a></span>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
 {% if call_activity.has_data %}
 <div class="card">
   <div class="card-head">
