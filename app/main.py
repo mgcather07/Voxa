@@ -1410,15 +1410,19 @@ def calls_page(
     device: str = "",
     date_from: str = "",
     date_to: str = "",
-    min_duration: int = 0,
+    min_duration: str = "",   # accept "" from the blank form field
     answered: str = "",
     mos_band: str = "",
     sort: str = "",
     session: Session = Depends(get_session),
     user: User = Depends(require_user),
 ):
+    try:
+        min_sec = int(min_duration) if str(min_duration).strip() else 0
+    except ValueError:
+        min_sec = 0
     results, match = calls.search_calls(
-        session, q, device, date_from, date_to, min_duration, answered,
+        session, q, device, date_from, date_to, min_sec, answered,
         mos_band=mos_band, sort=sort,
     )
     return templates.TemplateResponse(
@@ -1428,7 +1432,7 @@ def calls_page(
             results=results, match=match,
             filters={
                 "q": q, "device": device, "date_from": date_from,
-                "date_to": date_to, "min_duration": min_duration,
+                "date_to": date_to, "min_duration": min_sec or "",
                 "answered": answered, "mos_band": mos_band, "sort": sort,
             },
         ),
