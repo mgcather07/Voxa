@@ -271,7 +271,7 @@ def _dur(seconds) -> str:
 
 
 def build_ladder(legs: list[CallRecord], device_info: dict | None = None,
-                 node_desc: dict | None = None) -> dict | None:
+                 node_desc: dict | None = None, tz=None) -> dict | None:
     """Build a SIP-style ladder (sequence diagram) of a call's signalling.
 
     Lifelines are the parties plus the CallManager they route through; arrows
@@ -384,6 +384,15 @@ def build_ladder(legs: list[CallRecord], device_info: dict | None = None,
          "ip": meta[key].get("ip", ""), "cucm": key == cucm_key}
         for key in order
     ]
+    def _fmt(t):
+        if not t:
+            return ""
+        if tz is not None:
+            if t.tzinfo is None:
+                t = t.replace(tzinfo=timezone.utc)
+            t = t.astimezone(tz)
+        return t.strftime("%I:%M:%S %p").lstrip("0")
+
     arrows = []
     for i, e in enumerate(events):
         y = top + i * row_h
@@ -393,7 +402,7 @@ def build_ladder(legs: list[CallRecord], device_info: dict | None = None,
             "mid": (x1 + x2) / 2,
             "label": e["label"], "kind": e["kind"],
             "dir": 1 if x2 >= x1 else -1,
-            "time": e["t"].strftime("%I:%M:%S %p").lstrip("0") if e["t"] else "",
+            "time": _fmt(e["t"]),
         })
 
     return {

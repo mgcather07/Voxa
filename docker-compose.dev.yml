@@ -30,6 +30,11 @@ services:
     build: .
     command: ["uvicorn", "app.main:app",
               "--host", "0.0.0.0", "--port", "8000", "--reload"]
+    # Resolve internal short names (e.g. CORSYSLOG1) the way the host does over
+    # the VPN — the container otherwise has no search domain, so short names
+    # fail DNS while their FQDNs resolve. Add more domains here as needed.
+    dns_search:
+      - drummondco.net
     environment:
       DATABASE_URL: postgresql+psycopg://voxa:voxa@db:5432/voxa
       AUTH_DISABLED: "true"       # local only — skip login

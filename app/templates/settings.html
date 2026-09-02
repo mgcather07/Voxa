@@ -105,6 +105,46 @@
     <div class="footnote"><span>Add the <strong>publisher</strong> only — AXL runs there and RisPort returns cluster-wide registration, so one connection covers the whole cluster. Subscribers are <strong>discovered</strong> (listed under each cluster), not added separately. The service account needs Standard AXL API Access + the read-only CCM/Serviceability roles. Passwords are masked and never shown back.</span></div>
   </div>
 
+  <div class="card">
+    <div class="card-head">
+      <h2>CDR SFTP</h2>
+      <span class="subhead">pull call-record files from the SFTP server your billing app pushes to — Voxa downloads them into the CDR drop directory, then ingests. Reads your SFTP server only, never CUCM.</span>
+    </div>
+
+    {% if sftp_result %}
+    <div class="readonly" style="border-color:var(--hairline)">
+      <div class="readonly-head"><span>SFTP result</span></div>
+      <div class="readonly-body" style="display:flex;gap:8px;align-items:center">
+        <span class="pill {{ 'current' if sftp_result.ok else 'eol' }}">{{ 'ok' if sftp_result.ok else 'fail' }}</span>
+        <span class="mono" style="font-size:11.5px;color:var(--ink-2)">{{ sftp_result.message }}</span>
+      </div>
+    </div>
+    {% endif %}
+
+    {# One form: Test and Pull submit these same fields (via formaction), so
+       neither needs a prior Save. Save just persists them for later runs. #}
+    <form method="post" action="/settings/sftp">
+      <div class="cluster-row" style="margin-top:4px">
+        <label class="chk"><input type="checkbox" name="cdr_sftp_enabled" {{ 'checked' if values['cdr_sftp_enabled'] }}> Enabled</label>
+        <input type="text" name="cdr_sftp_host" value="{{ values['cdr_sftp_host'] }}" placeholder="SFTP host / IP" style="flex:1 1 200px">
+        <input type="number" name="cdr_sftp_port" value="{{ values['cdr_sftp_port'] or 22 }}" placeholder="22" style="width:70px">
+        <input type="text" name="cdr_sftp_user" value="{{ values['cdr_sftp_user'] }}" placeholder="username" style="width:150px">
+        <input type="password" name="cdr_sftp_password" placeholder="{{ 'unchanged' if values['cdr_sftp_password'] == secret_mask else 'password' }}" autocomplete="new-password" style="width:140px">
+      </div>
+      <div class="cluster-row" style="margin-top:8px">
+        <input type="text" name="cdr_sftp_dir" value="{{ values['cdr_sftp_dir'] }}" placeholder="remote directory (e.g. /CDR/)" style="flex:1 1 240px">
+        <label class="chk"><input type="checkbox" name="cdr_sftp_delete" {{ 'checked' if values['cdr_sftp_delete'] }}> Delete from server after download</label>
+      </div>
+      <div class="cluster-row" style="margin-top:12px;gap:8px">
+        <button class="btn btn-primary" type="submit" formaction="/settings/sftp/test">Test connection</button>
+        <button class="btn btn-primary" type="submit" formaction="/settings/sftp/pull">Pull &amp; ingest now</button>
+        <button class="btn btn-secondary" type="submit" style="margin-left:auto">Save</button>
+      </div>
+    </form>
+
+    <div class="footnote"><span><strong>Test</strong> and <strong>Pull</strong> use the values in the form — no need to Save first; <strong>Save</strong> just keeps them for later. Already-pulled files are skipped (matched by name against the drop directory and its <code>processed/</code> archive), so re-pulling never double-counts — turn on <strong>delete from server</strong> only if you want the server kept tidy.</span></div>
+  </div>
+
   <form method="post" action="/settings">
   <div class="card">
     <div class="card-head">
@@ -113,6 +153,7 @@
       <button class="btn btn-primary" type="submit" style="margin-left:auto">Save settings</button>
     </div>
     {% for group, fields in setting_groups.items() %}
+    {% if group != 'CDR SFTP' %}
     <div class="settings-group">
       <div class="uplabel">{{ group }}</div>
       {% for f in fields %}
@@ -134,6 +175,7 @@
       </div>
       {% endfor %}
     </div>
+    {% endif %}
     {% endfor %}
   </div>
   </form>

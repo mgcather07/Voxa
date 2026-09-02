@@ -35,6 +35,9 @@ class Settings(BaseSettings):
 
     # App behaviour
     app_name: str = "Voxa"
+    # IANA timezone for DISPLAYING timestamps (storage stays UTC). e.g.
+    # "America/Chicago". Empty/UTC shows UTC.
+    display_timezone: str = "UTC"
     site_from_device_pool: str = r"^(?:DP_)?(?P<site>[A-Za-z0-9]+)"
     mock_mode: bool = False
 
@@ -42,6 +45,19 @@ class Settings(BaseSettings):
     # call detail / call quality CSVs to (the OS/SFTP lands them here). Read by
     # scripts/ingest_cdr.py; the app never opens an SFTP connection itself.
     cdr_dir: str = "/var/lib/voxa/cdr"
+
+    # Optional SFTP pull of CDR/CMR files. When enabled, Voxa connects to the
+    # SFTP server the Billing Application Server pushes to, downloads new files
+    # into cdr_dir, then ingest folds them. Needs paramiko (requirements-sftp.txt).
+    # Reads from *your* SFTP server, never from CUCM; the password is stored in
+    # the DB and masked in the UI, same posture as the CUCM password.
+    cdr_sftp_enabled: bool = False
+    cdr_sftp_host: str = ""
+    cdr_sftp_port: int = 22
+    cdr_sftp_user: str = ""
+    cdr_sftp_password: str = ""
+    cdr_sftp_dir: str = ""
+    cdr_sftp_delete: bool = False  # remove each file from the server after download
 
     # SNMP polling of access switches for real PoE draw / budget (read-only).
     # Needs pysnmp (requirements-snmp.txt). Switches are the CDP neighbours Voxa

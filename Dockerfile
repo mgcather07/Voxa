@@ -16,9 +16,11 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /srv/app
 
-# Dependencies first so code edits do not invalidate the layer.
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Dependencies first so code edits do not invalidate the layer. The SFTP extra
+# (paramiko) is baked in because CDR-over-SFTP is a first-class feature here;
+# it stays in its own requirements file so other deployments can omit it.
+COPY requirements.txt requirements-sftp.txt ./
+RUN pip install --no-cache-dir -r requirements.txt -r requirements-sftp.txt
 
 COPY app ./app
 COPY config ./config

@@ -30,11 +30,19 @@ from .models import Cluster, Setting
 # key, type, secret, group, label
 SCHEMA = [
     ("app_name", "str", False, "Application", "App name"),
+    ("display_timezone", "str", False, "Application", "Display timezone (IANA, e.g. America/Chicago)"),
     ("phone_web_enabled", "bool", False, "Discovery", "Query phones for serial/switch"),
     ("phone_web_timeout", "int", False, "Discovery", "Phone web timeout (s)"),
     ("phone_web_concurrency", "int", False, "Discovery", "Phone query concurrency"),
     ("site_from_device_pool", "str", False, "Discovery", "Site-from-device-pool regex"),
     ("cdr_dir", "str", False, "CDR", "CDR/CMR drop directory"),
+    ("cdr_sftp_enabled", "bool", False, "CDR SFTP", "Enable SFTP pull"),
+    ("cdr_sftp_host", "str", False, "CDR SFTP", "SFTP host"),
+    ("cdr_sftp_port", "int", False, "CDR SFTP", "SFTP port"),
+    ("cdr_sftp_user", "str", False, "CDR SFTP", "Username"),
+    ("cdr_sftp_password", "str", True, "CDR SFTP", "Password"),
+    ("cdr_sftp_dir", "str", False, "CDR SFTP", "Remote directory"),
+    ("cdr_sftp_delete", "bool", False, "CDR SFTP", "Delete each file from the server after download"),
     ("snmp_enabled", "bool", False, "SNMP", "Enable SNMP PoE polling"),
     ("snmp_community", "str", True, "SNMP", "SNMP community"),
     ("snmp_timeout", "int", False, "SNMP", "SNMP timeout (s)"),
@@ -50,6 +58,10 @@ SCHEMA = [
 _BY_KEY = {row[0]: row for row in SCHEMA}
 SECRET_KEYS = {row[0] for row in SCHEMA if row[2]}
 SECRET_MASK = "••••••••"
+
+# The CDR-SFTP settings, saved as a subset by their own form (so its Save button
+# doesn't clear the other operational settings it doesn't include).
+SFTP_KEYS = {row[0] for row in SCHEMA if row[3] == "CDR SFTP"}
 
 
 def _coerce(value: str, kind: str):
@@ -96,11 +108,15 @@ def form_values(session: Session) -> dict:
     return values
 
 
-def save(session: Session, data: dict) -> None:
+def save(session: Session, data: dict, keys: set[str] | None = None) -> None:
     """Upsert settings from a submitted form. Unchecked bools become false; a
-    secret left as the mask (or blank) is preserved, not overwritten."""
+    secret left as the mask (or blank) is preserved, not overwritten.
+
+    ``keys`` limits the save to that subset of SCHEMA, so a form that carries
+    only some settings (e.g. the CDR-SFTP card) doesn't blank the rest."""
+    schema = SCHEMA if keys is None else [r for r in SCHEMA if r[0] in keys]
     existing = {s.key: s for s in session.scalars(select(Setting)).all()}
-    for key, kind, secret, _group, _label in SCHEMA:
+    for key, kind, secret, _group, _label in schema:
         if kind == "bool":
             new = "true" if data.get(key) else "false"
         else:

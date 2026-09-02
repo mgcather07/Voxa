@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import csv
 import logging
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -73,16 +74,11 @@ def _cmr_quality(row: dict) -> CallQuality | None:
     leg = _int(_pick(row, "callidentifier"))
     if leg is None:
         return None
-    mos_raw = _pick(row, "mos", "mlqkav", "mlqk", "mlqkmn")
-    try:
-        mos = float(mos_raw) if mos_raw else None
-    except (TypeError, ValueError):
-        mos = None
     return CallQuality(
         leg_id=leg,
         device=_pick(row, "devicename"),
         directory_number=_pick(row, "directorynum"),
-        mos=mos if mos and mos > 0 else None,
+        mos=_mos_from_row(row),
         jitter_ms=_float(_pick(row, "jitter")),
         latency_ms=_float(_pick(row, "latency")),
         packets_lost=_int(_pick(row, "numberpacketslost")),
@@ -104,32 +100,86 @@ def _pick(row: dict, *names: str):
     return None
 
 
+def _vq_metrics(row: dict) -> dict:
+    """Parse CUCM's ``varVQMetrics`` blob ('K1=v1;K2=v2;…') to a lowercased
+    dict. This is where modern CMR keeps the K-factor voice-quality metrics —
+    MOS (MLQKav), codec (VoRxCodec), concealed seconds (CS/SCS) and more."""
+    raw = _pick(row, "varvqmetrics")
+    out: dict[str, str] = {}
+    if raw:
+        for part in str(raw).split(";"):
+            key, sep, val = part.partition("=")
+            if sep:
+                out[key.strip().lower()] = val.strip()
+    return out
+
+
+def _mos_from_row(row: dict) -> float | None:
+    """The call's MOS. Prefers a top-level column (older CUCM), then MLQKav
+    (average MOS-LQK) from varVQMetrics. Returns None when no MOS was measured
+    for the leg — never 0."""
+    candidates = [_pick(row, "mos", "mlqkav", "mlqk", "mlqkmn")]
+    vq = _vq_metrics(row)
+    candidates += [vq.get("mlqkav"), vq.get("mlqk"), vq.get("mlqkmn")]
+    for raw in candidates:
+        if raw in (None, ""):
+            continue
+        try:
+            mos = float(raw)
+        except (TypeError, ValueError):
+            continue
+        if mos > 0:
+            return mos
+    return None
+
+
+# A CUCM CSV type-row cell: an all-caps SQL type, optionally sized, e.g.
+# INTEGER, VARCHAR(50), UNIQUEIDENTIFIER, DOUBLE PRECISION. Real data cells
+# (numbers, IPs, SEP… device names, timestamps) never match this shape, so a
+# row where *every* populated cell matches is CUCM's type row — whatever type
+# names a given cluster/version emits. Matching by shape avoids hardcoding a
+# list that misses one (as UNIQUEIDENTIFIER was).
+_TYPE_CELL = re.compile(r"^[A-Z][A-Z_ ]*(\([0-9, ]+\))?$")
+
+
+def _is_type_row(cells) -> bool:
+    seen = False
+    for c in cells:
+        c = c.strip().strip('"').strip()
+        if not c:
+            continue
+        seen = True
+        if not _TYPE_CELL.match(c):
+            return False
+    return seen
+
+
 def _rows(path: Path):
-    """Yield dict rows from a CUCM CSV, keys lower-cased, type row skipped."""
+    """Yield dict rows from a CUCM CSV, keys lower-cased, type row(s) skipped."""
     with path.open(newline="", encoding="utf-8", errors="replace") as fh:
         reader = csv.reader(fh)
         try:
             header = [h.strip().lower() for h in next(reader)]
         except StopIteration:
             return
-        for i, raw in enumerate(reader):
+        for raw in reader:
             if not raw:
                 continue
-            # Skip CUCM's type row (all cells look like INTEGER/VARCHAR).
-            if i == 0 and all(
-                c.strip().upper() in {"INTEGER", "VARCHAR", "FLOAT", "BOOLEAN"}
-                or c.strip().upper().startswith("VARCHAR")
-                for c in raw
-                if c.strip()
-            ):
+            if _is_type_row(raw):  # CUCM's type row, wherever it appears
                 continue
             yield dict(zip(header, raw))
 
 
 def _is_cmr(header_keys) -> bool:
+    """A CMR (quality) file, not a CDR. CMR carries per-stream stats keyed by a
+    single ``deviceName``; modern CUCM puts MOS in ``varVQMetrics`` rather than
+    a top-level column, so detect by any of those signals. CDR instead has
+    ``origDeviceName``/``destDeviceName`` and no packet counts."""
     keys = set(header_keys)
-    return "devicename" in keys and bool(
-        keys & {"mos", "mlqk", "mlqkav", "mlqkmn"}
+    if "varvqmetrics" in keys:
+        return True
+    return "devicename" in keys and (
+        "numberpacketssent" in keys or bool(keys & {"mos", "mlqk", "mlqkav", "mlqkmn"})
     )
 
 
@@ -147,7 +197,7 @@ class _Agg:
 def _fold_cdr(row: dict, agg: dict[str, _Agg]) -> None:
     orig = _pick(row, "origdevicename")
     dest = _pick(row, "destdevicename")
-    duration = int(float(_pick(row, "duration") or 0))
+    duration = _int(_pick(row, "duration")) or 0
     ts_raw = _pick(row, "datetimeorigination", "datetimeconnect")
     when = None
     if ts_raw:
@@ -174,12 +224,8 @@ def _fold_cmr(row: dict, agg: dict[str, _Agg]) -> None:
     device = _pick(row, "devicename")
     if not device or not str(device).startswith("SEP"):
         return
-    mos_raw = _pick(row, "mos", "mlqkav", "mlqk", "mlqkmn")
-    try:
-        mos = float(mos_raw)
-    except (TypeError, ValueError):
-        return
-    if mos <= 0:
+    mos = _mos_from_row(row)
+    if not mos:
         return
     a = agg.setdefault(device, _Agg())
     a.mos_sum += mos

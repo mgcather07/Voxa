@@ -11,6 +11,7 @@
 !config
 !scripts
 !requirements.txt
+!requirements-sftp.txt
 
 # Re-exclude junk that could live under the re-included dirs.
 **/__pycache__

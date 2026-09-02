@@ -7,8 +7,11 @@ import io
 import logging
 import secrets
 from datetime import timezone
+from functools import lru_cache
 from hashlib import sha256
 from pathlib import Path
+from types import SimpleNamespace
+from zoneinfo import ZoneInfo
 
 from fastapi import (
     BackgroundTasks,
@@ -33,6 +36,7 @@ from . import (
     api,
     calls,
     capacity,
+    cdr,
     certs,
     exports,
     history,
@@ -42,6 +46,7 @@ from . import (
     report_templates,
     reports,
     settings_store,
+    sftp,
     webhooks,
 )
 from .cucm_probe import probe as probe_cluster
@@ -113,33 +118,68 @@ except OSError:
     templates.env.globals["asset_v"] = "0"
 
 
+# --- display timezone -------------------------------------------------------
+# Stored timestamps are UTC (models.utcnow / CDR epoch seconds). We store UTC
+# and convert only for display, into the operator's timezone (Settings →
+# display_timezone). `_display_tz` is refreshed per request in `_ctx`; every
+# time filter localizes before formatting.
+_UTC = timezone.utc
+_display_tz = _UTC
+
+
+@lru_cache(maxsize=16)
+def _zone(name: str):
+    try:
+        return ZoneInfo(name) if name else _UTC
+    except Exception:  # noqa: BLE001 - unknown/unavailable tz name → UTC
+        return _UTC
+
+
+def display_tz():
+    return _display_tz
+
+
+def _localize(v):
+    """A UTC (or naive-UTC) datetime, rendered in the configured display tz."""
+    if v is None:
+        return None
+    if v.tzinfo is None:
+        v = v.replace(tzinfo=_UTC)
+    return v.astimezone(_display_tz)
+
+
 # Date/time display filters — 12-hour clock with AM/PM, no zero-padded day/hour.
 # Written without glibc's %-I/%-d so they render the same on Linux and macOS.
 def _fdt(v):          # "Aug 31, 2026 · 11:46 PM"
+    v = _localize(v)
     if v is None:
         return ""
     return f"{v.strftime('%b')} {v.day}, {v.year} · {v.strftime('%I:%M %p').lstrip('0')}"
 
 
 def _fdt_secs(v):     # "Aug 31, 2026 · 11:46:05 PM"
+    v = _localize(v)
     if v is None:
         return ""
     return f"{v.strftime('%b')} {v.day}, {v.year} · {v.strftime('%I:%M:%S %p').lstrip('0')}"
 
 
 def _fdt_compact(v):  # "Aug 31, 11:46 PM"
+    v = _localize(v)
     if v is None:
         return ""
     return f"{v.strftime('%b')} {v.day}, {v.strftime('%I:%M %p').lstrip('0')}"
 
 
 def _ftime(v):        # "11:46:05 PM"
+    v = _localize(v)
     if v is None:
         return ""
     return v.strftime('%I:%M:%S %p').lstrip('0')
 
 
 def _fdate(v):        # "Aug 31, 2026"
+    v = _localize(v)
     if v is None:
         return ""
     return f"{v.strftime('%b')} {v.day}, {v.year}"
@@ -260,6 +300,8 @@ def _fleet_total(session: Session) -> int:
 
 def _ctx(request: Request, session: Session, user: User | None = None, **extra) -> dict:
     cfg = settings_store.load(session)
+    global _display_tz
+    _display_tz = _zone(cfg.display_timezone)
     return {
         "request": request,
         "latest_run": _latest_run(session),
@@ -1178,6 +1220,83 @@ async def settings_save(
     return RedirectResponse(url="/settings", status_code=303)
 
 
+@app.post("/settings/sftp")
+async def sftp_save(
+    request: Request,
+    session: Session = Depends(get_session),
+    user: User = Depends(require_admin),
+):
+    form = await request.form()
+    settings_store.save(session, dict(form), keys=settings_store.SFTP_KEYS)
+    log.info("CDR SFTP settings updated by %s", user.username)
+    return RedirectResponse(url="/settings", status_code=303)
+
+
+def _sftp_form_cfg(session: Session, form) -> SimpleNamespace:
+    """Build an SFTP config from the *submitted form* so Test / Pull use the
+    values typed in the page — no Save required. A blank/masked password falls
+    back to the one already stored, and cdr_dir always comes from settings."""
+    stored = settings_store.load(session)
+    pw = (form.get("cdr_sftp_password") or "").strip()
+    if not pw or pw == settings_store.SECRET_MASK:
+        pw = stored.cdr_sftp_password
+    try:
+        port = int((form.get("cdr_sftp_port") or "22").strip() or 22)
+    except ValueError:
+        port = 22
+    return SimpleNamespace(
+        cdr_sftp_host=(form.get("cdr_sftp_host") or "").strip(),
+        cdr_sftp_port=port,
+        cdr_sftp_user=(form.get("cdr_sftp_user") or "").strip(),
+        cdr_sftp_password=pw,
+        cdr_sftp_dir=(form.get("cdr_sftp_dir") or "").strip(),
+        cdr_sftp_delete=bool(form.get("cdr_sftp_delete")),
+        cdr_dir=stored.cdr_dir,
+    )
+
+
+@app.post("/settings/sftp/test", response_class=HTMLResponse)
+async def sftp_test(
+    request: Request,
+    session: Session = Depends(get_session),
+    user: User = Depends(require_admin),
+):
+    form = await request.form()
+    result = sftp.test_connection(_sftp_form_cfg(session, form))
+    log.info("CDR SFTP test by %s: ok=%s", user.username, result.get("ok"))
+    return templates.TemplateResponse(
+        "settings.html", _settings_ctx(request, session, user, sftp_result=result)
+    )
+
+
+@app.post("/settings/sftp/pull", response_class=HTMLResponse)
+async def sftp_pull(
+    request: Request,
+    session: Session = Depends(get_session),
+    user: User = Depends(require_admin),
+):
+    form = await request.form()
+    cfg = _sftp_form_cfg(session, form)
+    pulled = sftp.pull(cfg, cfg.cdr_dir)
+    if pulled.get("ok"):
+        ingested = cdr.ingest_directory(session, cfg.cdr_dir)
+        session.commit()  # persist before archiving the consumed files
+        archived = cdr.archive_files(cfg.cdr_dir, ingested.get("processed", []))
+        result = {
+            "ok": True,
+            "message": (
+                f"{pulled['message']} Ingested {ingested['files']} file(s), "
+                f"updated {ingested['devices']} device(s); archived {archived}."
+            ),
+        }
+    else:
+        result = pulled
+    log.info("CDR SFTP pull by %s: %s", user.username, result.get("message"))
+    return templates.TemplateResponse(
+        "settings.html", _settings_ctx(request, session, user, sftp_result=result)
+    )
+
+
 @app.post("/settings/clusters")
 def cluster_add(
     name: str = Form(...),
@@ -1384,7 +1503,10 @@ def call_detail(
         for n in session.scalars(select(ClusterNode)).all()
         if n.description
     }
-    ladder = calls.build_ladder(legs, device_info=device_info, node_desc=node_desc)
+    ladder = calls.build_ladder(
+        legs, device_info=device_info, node_desc=node_desc,
+        tz=_zone(settings_store.load(session).display_timezone),
+    )
     quality_summary = calls.call_quality_summary(legs, quality)
     return templates.TemplateResponse(
         "call_detail.html",
