@@ -61,6 +61,9 @@ class Settings(BaseSettings):
     cdr_sftp_password: str = ""
     cdr_sftp_dir: str = ""
     cdr_sftp_delete: bool = False  # remove each file from the server after download
+    # Auto-pull + ingest every N minutes when SFTP is enabled (0 = manual only,
+    # click "Pull & ingest now"). Runs inside the app — no cron needed.
+    cdr_pull_interval_min: int = 0
 
     # SNMP polling of access switches for real PoE draw / budget (read-only).
     # Needs pysnmp (requirements-snmp.txt). Switches are the CDP neighbours Voxa

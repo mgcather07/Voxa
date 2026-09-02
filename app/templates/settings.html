@@ -133,6 +133,8 @@
       </div>
       <div class="cluster-row" style="margin-top:8px">
         <input type="text" name="cdr_sftp_dir" value="{{ values['cdr_sftp_dir'] }}" placeholder="remote directory (e.g. /CDR/)" style="flex:1 1 240px">
+        <label class="chk" style="gap:6px">Auto-pull every
+          <input type="number" name="cdr_pull_interval_min" value="{{ values['cdr_pull_interval_min'] or 0 }}" min="0" style="width:60px"> min</label>
         <label class="chk"><input type="checkbox" name="cdr_sftp_delete" {{ 'checked' if values['cdr_sftp_delete'] }}> Delete from server after download</label>
       </div>
       <div class="cluster-row" style="margin-top:12px;gap:8px">
@@ -142,7 +144,7 @@
       </div>
     </form>
 
-    <div class="footnote"><span><strong>Test</strong> and <strong>Pull</strong> use the values in the form — no need to Save first; <strong>Save</strong> just keeps them for later. Already-pulled files are skipped (matched by name against the drop directory and its <code>processed/</code> archive), so re-pulling never double-counts — turn on <strong>delete from server</strong> only if you want the server kept tidy.</span></div>
+    <div class="footnote"><span><strong>Test</strong> and <strong>Pull</strong> use the values in the form — no need to Save first. Set <strong>Enabled</strong> and an <strong>auto-pull</strong> interval, then <strong>Save</strong>, and Voxa pulls + ingests on that schedule automatically (no cron); leave the interval at 0 to pull only when you click. Already-pulled files are skipped by name against the drop directory and its <code>processed/</code> archive, so it never double-counts.</span></div>
   </div>
 
   <form method="post" action="/settings">

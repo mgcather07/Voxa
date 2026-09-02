@@ -6,6 +6,8 @@ import csv
 import io
 import logging
 import secrets
+import threading
+import time
 from datetime import timezone
 from functools import lru_cache
 from hashlib import sha256
@@ -27,7 +29,7 @@ from fastapi import (
 from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from sqlalchemy import desc, func, or_, select
+from sqlalchemy import desc, func, or_, select, text
 from sqlalchemy.orm import Session
 from starlette.middleware.sessions import SessionMiddleware
 
@@ -61,7 +63,7 @@ from .auth import (
     require_user,
 )
 from .config import get_settings
-from .db import get_session, init_db
+from .db import engine, get_session, init_db, session_scope
 from .models import (
     SWAP_STATUSES,
     ApiToken,
@@ -274,9 +276,68 @@ def _handle_redirect_to_login(request: Request, exc: RedirectToLogin):
     return redirect_to_login(exc.next_url)
 
 
+# ---------------------------------------------------------------------------
+# Background CDR auto-pull. When SFTP is enabled and an interval is set, pull +
+# ingest run on a timer inside the app — no cron. A Postgres advisory lock makes
+# it safe with multiple workers: only one runs a cycle at a time.
+# ---------------------------------------------------------------------------
+_CDR_LOCK_KEY = 84713  # arbitrary, stable advisory-lock id for the CDR puller
+
+
+def _run_scheduled_pull() -> None:
+    """One auto-pull cycle: pull → ingest → archive → prune, under an advisory
+    lock so concurrent workers don't collide. Best-effort; logs and moves on."""
+    conn = engine.connect()
+    try:
+        got = conn.exec_driver_sql(
+            "SELECT pg_try_advisory_lock(%(k)s)", {"k": _CDR_LOCK_KEY}
+        ).scalar()
+        if not got:
+            return  # another worker holds it
+        cfg = settings_store.load()
+        pulled = sftp.pull(cfg, cfg.cdr_dir)
+        if not pulled.get("ok"):
+            log.info("CDR auto-pull: %s", pulled.get("message"))
+            return
+        with session_scope() as session:
+            ingested = cdr.ingest_directory(session, cfg.cdr_dir)
+        cdr.archive_files(cfg.cdr_dir, ingested.get("processed", []))
+        pruned = cdr.prune_processed(cfg.cdr_dir, cfg.cdr_retention_days)
+        if ingested["files"] or pruned:
+            log.info("CDR auto-pull: %s ingested %s file(s), pruned %s.",
+                     pulled.get("message"), ingested["files"], pruned)
+    except Exception:  # noqa: BLE001 - a bad cycle must not kill the loop
+        log.exception("CDR auto-pull cycle failed")
+    finally:
+        try:
+            conn.exec_driver_sql(
+                "SELECT pg_advisory_unlock(%(k)s)", {"k": _CDR_LOCK_KEY}
+            )
+        except Exception:  # noqa: BLE001
+            pass
+        conn.close()
+
+
+def _cdr_scheduler_loop() -> None:
+    while True:
+        interval = 0
+        try:
+            cfg = settings_store.load()
+            interval = max(int(cfg.cdr_pull_interval_min or 0), 0)
+            if interval and cfg.cdr_sftp_enabled and (cfg.cdr_sftp_host or "").strip():
+                _run_scheduled_pull()
+        except Exception:  # noqa: BLE001
+            log.exception("CDR scheduler tick failed")
+        # When off, re-check every minute so toggling it on takes effect quickly.
+        time.sleep(interval * 60 if interval else 60)
+
+
 @app.on_event("startup")
 def _startup() -> None:
     init_db()
+    threading.Thread(
+        target=_cdr_scheduler_loop, name="cdr-scheduler", daemon=True
+    ).start()
     if settings.secret_is_default and not settings.auth_disabled:
         log.warning(
             "SECRET_KEY is still the built-in default. Session cookies are "

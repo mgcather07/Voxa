@@ -44,6 +44,7 @@ SCHEMA = [
     ("cdr_sftp_password", "str", True, "CDR SFTP", "Password"),
     ("cdr_sftp_dir", "str", False, "CDR SFTP", "Remote directory"),
     ("cdr_sftp_delete", "bool", False, "CDR SFTP", "Delete each file from the server after download"),
+    ("cdr_pull_interval_min", "int", False, "CDR SFTP", "Auto-pull every N minutes (0 = manual)"),
     ("snmp_enabled", "bool", False, "SNMP", "Enable SNMP PoE polling"),
     ("snmp_community", "str", True, "SNMP", "SNMP community"),
     ("snmp_timeout", "int", False, "SNMP", "SNMP timeout (s)"),
