@@ -186,23 +186,43 @@ def _fold_cmr(row: dict, agg: dict[str, _Agg]) -> None:
     a.mos_count += 1
 
 
-def ingest_directory(session: Session, directory: str | Path) -> dict:
-    """Fold every CDR/CMR file in a directory into CallStat rows.
+# Files still mid-transfer or not call data — never ingest these.
+_SKIP_SUFFIXES = (".tmp", ".part", ".filepart", ".writing")
+_ARCHIVE_DIR = "processed"
 
-    Additive: re-running with new files keeps accumulating. Returns a small
-    summary for the CLI/logs.
+
+def ingest_directory(session: Session, directory: str | Path) -> dict:
+    """Fold every new CDR/CMR file in a directory into CallStat rows.
+
+    Ingest is additive, so each file must be counted exactly once. This reads
+    only the top level of ``directory`` (the SFTP landing spot) and returns the
+    paths it consumed in ``processed`` — the caller archives them with
+    :func:`archive_files` *after* the DB commit, so a file is moved out of the
+    landing spot only once its data is durably saved. On the next run those
+    files are gone, so nothing is double-counted.
+
+    Files in the ``processed/`` archive subdirectory, partial transfers
+    (``.tmp``/``.part``/…), and empty files are skipped.
     """
     directory = Path(directory)
     agg: dict[str, _Agg] = {}
-    files = 0
+    consumed: list[Path] = []
     if directory.is_dir():
         for path in sorted(directory.glob("*")):
+            if path.is_dir():
+                continue  # skip processed/ and any other subdirectory
             if not path.is_file() or path.suffix.lower() not in {".csv", ".txt", ""}:
+                continue
+            if path.name.endswith(_SKIP_SUFFIXES):
+                continue
+            try:
+                if path.stat().st_size == 0:
+                    continue  # empty / still being written
+            except OSError:
                 continue
             sample = list(_first_header(path))
             if not sample:
                 continue
-            files += 1
             is_cmr = _is_cmr(sample)
             for row in _rows(path):
                 if is_cmr:
@@ -215,6 +235,7 @@ def ingest_directory(session: Session, directory: str | Path) -> dict:
                     record = _cdr_record(row)
                     if record is not None:
                         session.add(record)
+            consumed.append(path)
 
     existing = {
         c.device_name: c for c in session.scalars(select(CallStat)).all()
@@ -238,7 +259,32 @@ def ingest_directory(session: Session, directory: str | Path) -> dict:
             stat.last_call_at = a.last
         stat.updated_at = datetime.now(timezone.utc)
 
-    return {"files": files, "devices": len(agg)}
+    return {"files": len(consumed), "devices": len(agg),
+            "processed": [str(p) for p in consumed]}
+
+
+def archive_files(directory: str | Path, paths: list[str]) -> int:
+    """Move consumed files into ``<directory>/processed/`` so a later run never
+    re-ingests them. Call only after the ingest transaction has committed. A
+    move that fails is logged, not fatal — the file simply stays and would be
+    re-read next run (a rare double-count beats losing the file)."""
+    if not paths:
+        return 0
+    archive = Path(directory) / _ARCHIVE_DIR
+    try:
+        archive.mkdir(parents=True, exist_ok=True)
+    except OSError as exc:
+        log.warning("CDR: could not create archive dir %s: %s", archive, exc)
+        return 0
+    moved = 0
+    for p in paths:
+        src = Path(p)
+        try:
+            src.rename(archive / src.name)
+            moved += 1
+        except OSError as exc:
+            log.warning("CDR: could not archive %s: %s", src.name, exc)
+    return moved
 
 
 def _first_header(path: Path):

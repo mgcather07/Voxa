@@ -30,9 +30,12 @@ def main() -> int:
             select(func.count()).select_from(CallQuality)
             .where(CallQuality.mos.is_not(None), CallQuality.mos < 3.6)
         ) or 0
+    # Archive consumed files only after the transaction above has committed, so
+    # a file is moved out of the landing directory only once its data is saved.
+    archived = cdr.archive_files(directory, result.get("processed", []))
     print(
         f"Ingested {result['files']} file(s) from {directory}; "
-        f"updated {result['devices']} device(s)."
+        f"updated {result['devices']} device(s); archived {archived} to processed/."
     )
     # Opt-in webhook (no-op unless enabled).
     webhooks.fire("call.quality_alert", {"poor_quality_legs": int(poor)})
