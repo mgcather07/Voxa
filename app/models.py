@@ -457,6 +457,11 @@ class CallQuality(Base):
     latency_ms: Mapped[float | None] = mapped_column(Float)
     packets_lost: Mapped[int | None] = mapped_column(Integer)
     packets_sent: Mapped[int | None] = mapped_column(Integer)
+    # From the varVQMetrics blob (K-factor). Codec name + packet-loss concealment
+    # seconds — the extra quality context an engineer wants on a bad call.
+    codec: Mapped[str | None] = mapped_column(String(48))
+    concealed_secs: Mapped[int | None] = mapped_column(Integer)
+    severely_concealed_secs: Mapped[int | None] = mapped_column(Integer)
 
     @property
     def loss_pct(self) -> float | None:

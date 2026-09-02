@@ -74,6 +74,8 @@ def _cmr_quality(row: dict) -> CallQuality | None:
     leg = _int(_pick(row, "callidentifier"))
     if leg is None:
         return None
+    vq = _vq_metrics(row)
+    codec = vq.get("vorxcodec") or vq.get("votxcodec") or None
     return CallQuality(
         leg_id=leg,
         device=_pick(row, "devicename"),
@@ -83,6 +85,9 @@ def _cmr_quality(row: dict) -> CallQuality | None:
         latency_ms=_float(_pick(row, "latency")),
         packets_lost=_int(_pick(row, "numberpacketslost")),
         packets_sent=_int(_pick(row, "numberpacketssent")),
+        codec=(codec[:48] if codec else None),
+        concealed_secs=_int(vq.get("cs")),
+        severely_concealed_secs=_int(vq.get("scs")),
     )
 
 
@@ -331,6 +336,27 @@ def archive_files(directory: str | Path, paths: list[str]) -> int:
         except OSError as exc:
             log.warning("CDR: could not archive %s: %s", src.name, exc)
     return moved
+
+
+def prune_processed(directory: str | Path, days: int) -> int:
+    """Delete archived files older than ``days`` from ``<directory>/processed/``
+    so the local archive stays bounded. ``days`` <= 0 keeps everything. Returns
+    how many were removed."""
+    if not days or days <= 0:
+        return 0
+    archive = Path(directory) / _ARCHIVE_DIR
+    if not archive.is_dir():
+        return 0
+    cutoff = datetime.now(timezone.utc).timestamp() - days * 86400
+    removed = 0
+    for p in archive.glob("*"):
+        try:
+            if p.is_file() and p.stat().st_mtime < cutoff:
+                p.unlink()
+                removed += 1
+        except OSError as exc:  # noqa: PERF203
+            log.warning("CDR: could not prune %s: %s", p.name, exc)
+    return removed
 
 
 def _first_header(path: Path):

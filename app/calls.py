@@ -255,6 +255,9 @@ def call_quality_summary(
         "loss_pct": worst.loss_pct,
         "packets_lost": worst.packets_lost,
         "packets_sent": worst.packets_sent,
+        "codec": worst.codec,
+        "concealed_secs": worst.concealed_secs,
+        "severely_concealed_secs": worst.severely_concealed_secs,
         "legs_measured": len(measured),
         "likely_issue": mos_lib.likely_issue(
             worst.loss_pct, worst.jitter_ms, worst.latency_ms

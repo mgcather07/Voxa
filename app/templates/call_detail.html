@@ -63,6 +63,26 @@
         <span class="cm-v tnum">{{ quality_summary.latency_ms }} ms</span>
       </div>
       {% endif %}
+      {% if quality_summary.codec %}
+      <div class="callq-metric">
+        <span class="cm-l">Codec</span>
+        <span class="cm-v" style="font-size:15px">{{ quality_summary.codec }}</span>
+      </div>
+      {% endif %}
+      {% if quality_summary.concealed_secs is not none %}
+      <div class="callq-metric">
+        <span class="cm-l">Concealed sec</span>
+        <span class="cm-v tnum">{{ quality_summary.concealed_secs }}</span>
+        <span class="cm-s">packet-loss concealment</span>
+      </div>
+      {% endif %}
+      {% if quality_summary.severely_concealed_secs is not none %}
+      <div class="callq-metric {{ 'm-bad' if quality_summary.severely_concealed_secs }}">
+        <span class="cm-l">Severely concealed</span>
+        <span class="cm-v tnum">{{ quality_summary.severely_concealed_secs }}</span>
+        <span class="cm-s">seconds badly degraded</span>
+      </div>
+      {% endif %}
     </div>
   </div>
   <div class="footnote">

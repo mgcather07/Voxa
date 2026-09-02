@@ -33,9 +33,11 @@ def main() -> int:
     # Archive consumed files only after the transaction above has committed, so
     # a file is moved out of the landing directory only once its data is saved.
     archived = cdr.archive_files(directory, result.get("processed", []))
+    pruned = cdr.prune_processed(directory, settings_store.load().cdr_retention_days)
     print(
         f"Ingested {result['files']} file(s) from {directory}; "
-        f"updated {result['devices']} device(s); archived {archived} to processed/."
+        f"updated {result['devices']} device(s); archived {archived} to processed/"
+        + (f"; pruned {pruned} old file(s)." if pruned else ".")
     )
     # Opt-in webhook (no-op unless enabled).
     webhooks.fire("call.quality_alert", {"poor_quality_legs": int(poor)})

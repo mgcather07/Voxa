@@ -1282,11 +1282,15 @@ async def sftp_pull(
         ingested = cdr.ingest_directory(session, cfg.cdr_dir)
         session.commit()  # persist before archiving the consumed files
         archived = cdr.archive_files(cfg.cdr_dir, ingested.get("processed", []))
+        pruned = cdr.prune_processed(
+            cfg.cdr_dir, settings_store.load(session).cdr_retention_days
+        )
         result = {
             "ok": True,
             "message": (
                 f"{pulled['message']} Ingested {ingested['files']} file(s), "
-                f"updated {ingested['devices']} device(s); archived {archived}."
+                f"updated {ingested['devices']} device(s); archived {archived}"
+                + (f"; pruned {pruned} old." if pruned else ".")
             ),
         }
     else:
@@ -1437,8 +1441,11 @@ def analytics_page(
     session: Session = Depends(get_session),
     user: User = Depends(require_user),
 ):
+    a = analytics.overview(
+        session, tz=_zone(settings_store.load(session).display_timezone)
+    )
     return templates.TemplateResponse(
-        "analytics.html", _ctx(request, session, user, a=analytics.overview(session))
+        "analytics.html", _ctx(request, session, user, a=a)
     )
 
 

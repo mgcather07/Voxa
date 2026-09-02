@@ -36,6 +36,7 @@ SCHEMA = [
     ("phone_web_concurrency", "int", False, "Discovery", "Phone query concurrency"),
     ("site_from_device_pool", "str", False, "Discovery", "Site-from-device-pool regex"),
     ("cdr_dir", "str", False, "CDR", "CDR/CMR drop directory"),
+    ("cdr_retention_days", "int", False, "CDR", "Keep processed files (days; 0 = forever)"),
     ("cdr_sftp_enabled", "bool", False, "CDR SFTP", "Enable SFTP pull"),
     ("cdr_sftp_host", "str", False, "CDR SFTP", "SFTP host"),
     ("cdr_sftp_port", "int", False, "CDR SFTP", "SFTP port"),

@@ -45,6 +45,9 @@ class Settings(BaseSettings):
     # call detail / call quality CSVs to (the OS/SFTP lands them here). Read by
     # scripts/ingest_cdr.py; the app never opens an SFTP connection itself.
     cdr_dir: str = "/var/lib/voxa/cdr"
+    # Keep ingested CDR/CMR files in cdr_dir/processed/ this many days, then
+    # prune (0 = keep forever). Bounds local disk on a live feed.
+    cdr_retention_days: int = 0
 
     # Optional SFTP pull of CDR/CMR files. When enabled, Voxa connects to the
     # SFTP server the Billing Application Server pushes to, downloads new files

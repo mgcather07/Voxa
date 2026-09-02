@@ -9,7 +9,7 @@ causes, and missed calls.
 from __future__ import annotations
 
 from collections import Counter
-from datetime import timedelta
+from datetime import timedelta, timezone
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -65,9 +65,19 @@ def quality_issues(session: Session, limit: int = 12) -> list[dict]:
     return out
 
 
-def overview(session: Session) -> dict:
+def _localize(dt, tz):
+    """UTC (or naive-UTC) datetime in the display tz, for local day/hour
+    bucketing. Returns dt unchanged when no tz is given."""
+    if dt is None or tz is None:
+        return dt
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(tz)
+
+
+def overview(session: Session, tz=None) -> dict:
     rows = _legs(session)
-    now = utcnow()
+    now = _localize(utcnow(), tz)
     days = 14
 
     by_day = {(now.date() - timedelta(days=i)): {"total": 0, "answered": 0}
@@ -94,12 +104,13 @@ def overview(session: Session) -> dict:
                 gw_calls[dev] += 1
                 gw_seconds[dev] += duration or 0
         if orig_time is not None:
-            d = orig_time.date()
+            ot = _localize(orig_time, tz)
+            d = ot.date()
             if d in by_day:
                 by_day[d]["total"] += 1
                 if answered:
                     by_day[d]["answered"] += 1
-            by_hour[orig_time.hour] += 1
+            by_hour[ot.hour] += 1
 
     day_series = [
         {"day": d, "total": v["total"], "answered": v["answered"]}
