@@ -1768,3 +1768,37 @@ th.sortable a:hover { color: var(--cyan); }
 /* Certificates — raw probe error + per-CUBE status chips. */
 .cert-raw { font-size: 11px; color: var(--ink-2); margin-top: 3px; word-break: break-word; }
 .probe-chips { display: flex; flex-wrap: wrap; gap: 5px; }
+
+/* ==========================================================================
+   Phone inventory table — fit the 12 columns better and scroll cleanly:
+   truncate the long description, tighten spacing, and pin the Device column
+   so it stays in view when scrolling sideways.
+   ========================================================================== */
+.scrollbox.phones { max-height: 68vh; overscroll-behavior: contain; }
+.scrollbox.phones table.grid-table th,
+.scrollbox.phones table.grid-table td { padding: 8px 10px; }
+.scrollbox.phones td.desc   { max-width: 200px; }
+.scrollbox.phones td.model  { max-width: 150px; }
+.scrollbox.phones td.switch { max-width: 170px; }
+.scrollbox.phones td.rep    { max-width: 140px; }
+.scrollbox.phones td.desc,
+.scrollbox.phones td.model,
+.scrollbox.phones td.switch,
+.scrollbox.phones td.rep {
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+/* Pin the Device column (first cell) during horizontal scroll. */
+.scrollbox.phones th:first-child,
+.scrollbox.phones td:first-child {
+  position: sticky; left: 0; background: var(--surface-2); z-index: 1;
+}
+.scrollbox.phones thead th:first-child { z-index: 4; background: var(--table-head); }
+.scrollbox.phones tbody tr:hover td:first-child {
+  background: color-mix(in srgb, #fff 3%, var(--surface-2));
+}
+/* Hairline on the pinned column's edge so rows read cleanly scrolling under it. */
+.scrollbox.phones th:first-child::after,
+.scrollbox.phones td:first-child::after {
+  content: ""; position: absolute; top: 0; right: 0; bottom: 0; width: 1px;
+  background: var(--hairline-soft);
+}

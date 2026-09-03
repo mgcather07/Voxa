@@ -4,9 +4,9 @@
 {% for p in phones %}
 <tr>
   <td class="device"><a href="/phones/{{ p.id }}">{{ p.device_name }}</a></td>
-  <td class="desc">{{ p.description or "" }}</td>
+  <td class="desc" title="{{ p.description or '' }}">{{ p.description or "" }}</td>
   <td class="mono">{{ p.directory_number or "" }}</td>
-  <td>{{ p.model_raw or p.model_key or "—" }}</td>
+  <td class="model" title="{{ p.model_raw or p.model_key or '' }}">{{ p.model_raw or p.model_key or "—" }}</td>
   <td><span class="pill {{ p.lifecycle or 'unknown' }}">{{ p.lifecycle or "unknown" }}</span></td>
   <td>
     {% if p.registration_status == "Registered" %}
@@ -17,13 +17,14 @@
   </td>
   <td class="mono ink2">{{ p.ip_address or "" }}</td>
   <td class="serial {{ 'none' if not p.serial_number }}">{{ p.serial_number or "—" }}</td>
-  <td class="switch {{ 'none' if not p.switch_name }}">
+  <td class="switch {{ 'none' if not p.switch_name }}"
+      title="{% if p.switch_name %}{{ p.switch_name }}{% if p.switch_port %} · {{ p.switch_port }}{% endif %}{% else %}not reachable{% endif %}">
     {%- if p.switch_name -%}
       {{ p.switch_name }}{% if p.switch_port %} · {{ p.switch_port }}{% endif %}
     {%- else -%}not reachable{%- endif -%}
   </td>
   <td class="num">{{ "%.2f W"|format(p.poe_watts or 0) }}</td>
-  <td class="rep">{{ p.replacement_name or "no change" }}</td>
+  <td class="rep" title="{{ p.replacement_name or 'no change' }}">{{ p.replacement_name or "no change" }}</td>
   <td id="swap-{{ p.id }}">
     {% with phone = p %}{% include "_swap_cell.html" %}{% endwith %}
   </td>
