@@ -149,13 +149,20 @@ image-push:
 # image tarball.
 bundle:
 	@mkdir -p $(DIST)/voxa-deploy-$(VERSION)/deploy/certs
+	@mkdir -p $(DIST)/voxa-deploy-$(VERSION)/docs
 	cp docker-compose.prod.yml $(DIST)/voxa-deploy-$(VERSION)/
 	cp .env.prod.example       $(DIST)/voxa-deploy-$(VERSION)/
+	cp Makefile                $(DIST)/voxa-deploy-$(VERSION)/
 	cp deploy/nginx.conf       $(DIST)/voxa-deploy-$(VERSION)/deploy/
+	cp deploy/install.sh       $(DIST)/voxa-deploy-$(VERSION)/install.sh
+	chmod +x                   $(DIST)/voxa-deploy-$(VERSION)/install.sh
 	cp deploy/SERVER.md        $(DIST)/voxa-deploy-$(VERSION)/README.md
+	cp docs/UPGRADE.md         $(DIST)/voxa-deploy-$(VERSION)/docs/
+	cp docs/DEPLOY.md          $(DIST)/voxa-deploy-$(VERSION)/docs/ 2>/dev/null || true
 	touch $(DIST)/voxa-deploy-$(VERSION)/deploy/certs/.gitkeep
 	cd $(DIST) && tar czf voxa-deploy-$(VERSION).tar.gz voxa-deploy-$(VERSION)
 	@echo "Wrote $(DIST)/voxa-deploy-$(VERSION).tar.gz (source-free server bundle)"
+	@echo "Ship it with voxa-image-$(VERSION).tar.gz; on the server: tar xzf, ./install.sh"
 
 # --- Run & operate on the server --------------------------------------------
 image-load:
@@ -164,8 +171,9 @@ image-load:
 
 up:
 	$(PROD) up -d
-	@echo "Started. If this is the first run, create an account with:"
-	@echo "  make create-user NAME=yourname"
+	@echo "Started. On first run, open https://<this-host>/ in a browser —"
+	@echo "the setup wizard creates your admin account. (CLI alternative:"
+	@echo "  make create-user NAME=yourname)"
 
 down:
 	$(PROD) down
