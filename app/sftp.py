@@ -41,8 +41,16 @@ def _connect(cfg):
         ) from exc
 
     client = paramiko.SSHClient()
-    # We're pulling from the operator's own server; accept the host key rather
-    # than requiring a preloaded known_hosts on the VM.
+    # Trust on first use: pin the server's host key the first time we connect,
+    # then verify it on every later connect. AutoAddPolicy only fires for an
+    # UNKNOWN host; once pinned, a changed key raises BadHostKeyException — the
+    # alarm for a man-in-the-middle. The pin persists in the CDR data dir.
+    known_hosts = _known_hosts_path(cfg)
+    if known_hosts:
+        try:
+            client.load_host_keys(known_hosts)
+        except (OSError, IOError):
+            pass
     client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
     client.connect(
         hostname=cfg.cdr_sftp_host,
@@ -55,13 +63,35 @@ def _connect(cfg):
         allow_agent=False,
         look_for_keys=False,
     )
+    # Persist the pin (new host keys added by AutoAddPolicy) across restarts.
+    if known_hosts:
+        try:
+            client.save_host_keys(known_hosts)
+        except (OSError, IOError):
+            pass
     return client, client.open_sftp()
+
+
+def _known_hosts_path(cfg) -> str | None:
+    """Where the pinned SFTP host key lives — under the CDR data dir, which is
+    a persistent mounted volume. None if we can't determine a writable dir."""
+    try:
+        d = Path(cfg.cdr_dir)
+        d.mkdir(parents=True, exist_ok=True)
+        return str(d / ".voxa_sftp_known_hosts")
+    except (OSError, IOError, TypeError):
+        return None
 
 
 def _friendly(exc: Exception) -> str:
     """Turn a connection/transfer exception into an operator-readable reason."""
     try:
         import paramiko  # type: ignore
+        if isinstance(exc, paramiko.BadHostKeyException):
+            return ("SFTP host key CHANGED since it was first trusted — this "
+                    "could be a man-in-the-middle, or the server was rebuilt. "
+                    "If the change is expected, clear the pinned key "
+                    "(.voxa_sftp_known_hosts in the CDR directory) and retry.")
         if isinstance(exc, paramiko.AuthenticationException):
             return "Authentication failed — check the username and password."
         if isinstance(exc, paramiko.SSHException):
