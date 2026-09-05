@@ -1814,3 +1814,15 @@ th.sortable a:hover { color: var(--cyan); }
 .setup-lead { font-size: 13px; color: var(--ink-2); line-height: 1.5; margin: 0 0 18px; }
 .setup-foot { font-size: 11.5px; color: var(--ink-3); line-height: 1.5; margin-top: 16px;
   padding-top: 14px; border-top: 1px solid var(--hairline-soft); }
+
+/* About page. */
+.about-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
+.about-kv {
+  padding: 12px 14px; border-radius: var(--radius-md);
+  background: var(--surface-inset); border: 1px solid var(--hairline-soft);
+  display: flex; flex-direction: column; gap: 4px;
+}
+.about-kv .k { font-size: 10.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--ink-3); }
+.about-kv .v { font-size: 18px; font-weight: 700; color: var(--ink-1); }
+.about-p { font-size: 13px; color: var(--ink-2); line-height: 1.55; margin: 0 0 10px; }
+.about-note { font-size: 11.5px; color: var(--ink-3); line-height: 1.5; margin: 0; }

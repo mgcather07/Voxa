@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}About &middot; {{ settings.app_name }}{% endblock %}
+{% block page_title %}About{% endblock %}
+{% block content %}
+
+<div class="section">
+  <div class="card pad-lg">
+    <div class="card-head">
+      <h2>{{ app_name }}</h2>
+      <span class="subhead">CUCM call telemetry &amp; phone-refresh planning — read-only</span>
+    </div>
+
+    <div class="about-grid">
+      <div class="about-kv"><span class="k">Version</span><span class="v mono">{{ version }}</span></div>
+      <div class="about-kv"><span class="k">Environment</span><span class="v mono">{{ env }}</span></div>
+      <div class="about-kv"><span class="k">Database schema</span><span class="v mono">{{ db_rev or "—" }}</span></div>
+      <div class="about-kv"><span class="k">Phones tracked</span><span class="v tnum">{{ phone_count | comma }}</span></div>
+    </div>
+  </div>
+
+  <div class="grid dash-two">
+    <div class="card pad-lg">
+      <div class="card-head"><h2>License</h2></div>
+      {% if licensed_to %}
+      <p class="about-p">Licensed to <strong>{{ licensed_to }}</strong>.</p>
+      {% endif %}
+      <p class="about-p">{{ app_name }} is proprietary software, provided under a
+        commercial license agreement. Use, deployment, and redistribution are
+        governed by that agreement. It is not open source.</p>
+      <p class="about-note">Set the licensed organization in
+        <a href="/settings">Settings → Application</a>.</p>
+    </div>
+
+    <div class="card pad-lg">
+      <div class="card-head"><h2>Support</h2></div>
+      {% if support_contact %}
+        {% if '@' in support_contact and '://' not in support_contact %}
+        <p class="about-p">Contact <a href="mailto:{{ support_contact }}">{{ support_contact }}</a>.</p>
+        {% elif '://' in support_contact %}
+        <p class="about-p">Contact <a href="{{ support_contact }}" rel="noopener">{{ support_contact }}</a>.</p>
+        {% else %}
+        <p class="about-p">Contact <strong>{{ support_contact }}</strong>.</p>
+        {% endif %}
+      {% else %}
+      <p class="about-p">No support contact configured. Set one in
+        <a href="/settings">Settings → Application</a> so your team knows who to reach.</p>
+      {% endif %}
+      <p class="about-note">Before opening a ticket, run <code>make check</code> on
+        the server — it tests AXL, RisPort, and a phone scrape independently and
+        names any missing CUCM role.</p>
+    </div>
+  </div>
+
+  <div class="card pad-lg">
+    <div class="card-head">
+      <h2>Read-only by design</h2>
+    </div>
+    <p class="about-p">{{ app_name }} never writes to Call Manager. Every CUCM
+      call is a read (AXL SQL queries, RisPort registration lookups, and the
+      phones' own web pages). That property is why it is safe to point at a
+      production cluster, and the application log at INFO is the evidence of it.</p>
+  </div>
+</div>
+
+{% endblock %}

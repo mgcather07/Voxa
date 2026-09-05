@@ -1357,6 +1357,29 @@ def _settings_ctx(request, session, user, **extra):
     )
 
 
+@app.get("/about", response_class=HTMLResponse)
+def about_page(
+    request: Request,
+    session: Session = Depends(get_session),
+    user: User = Depends(require_user),
+):
+    cfg = settings_store.load(session)
+    try:
+        db_rev = session.execute(
+            text("SELECT version_num FROM alembic_version")
+        ).scalar()
+    except Exception:  # noqa: BLE001
+        db_rev = None
+    phones = session.scalar(select(func.count()).select_from(Phone)) or 0
+    return templates.TemplateResponse(
+        "about.html",
+        _ctx(request, session, user,
+             version=settings.voxa_version, db_rev=db_rev,
+             licensed_to=cfg.licensed_to, support_contact=cfg.support_contact,
+             phone_count=phones, env=settings.voxa_env),
+    )
+
+
 @app.get("/settings", response_class=HTMLResponse)
 def settings_page(
     request: Request,

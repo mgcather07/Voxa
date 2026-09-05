@@ -38,11 +38,19 @@ class Settings(BaseSettings):
     # The dev stack sets VOXA_ENV=development to relax them.
     voxa_env: str = "production"
 
+    # Build version, stamped into the image at build time (Dockerfile ARG ->
+    # VOXA_VERSION env). Shown on the About page.
+    voxa_version: str = "dev"
+
     # App behaviour
     app_name: str = "Voxa"
     # IANA timezone for DISPLAYING timestamps (storage stays UTC). e.g.
     # "America/Chicago". Empty/UTC shows UTC.
     display_timezone: str = "UTC"
+
+    # Shown on the About page. Set per customer/reseller in Settings.
+    licensed_to: str = ""
+    support_contact: str = ""
     site_from_device_pool: str = r"^(?:DP_)?(?P<site>[A-Za-z0-9]+)"
     mock_mode: bool = False
 

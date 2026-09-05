@@ -31,6 +31,8 @@ from .models import Cluster, Setting
 SCHEMA = [
     ("app_name", "str", False, "Application", "App name"),
     ("display_timezone", "str", False, "Application", "Display timezone (IANA, e.g. America/Chicago)"),
+    ("licensed_to", "str", False, "Application", "Licensed to (organization on the About page)"),
+    ("support_contact", "str", False, "Application", "Support contact (email or URL, shown on About)"),
     ("phone_web_enabled", "bool", False, "Discovery", "Query phones for serial/switch"),
     ("phone_web_timeout", "int", False, "Discovery", "Phone web timeout (s)"),
     ("phone_web_concurrency", "int", False, "Discovery", "Phone query concurrency"),
