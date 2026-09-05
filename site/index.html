@@ -247,6 +247,13 @@
   .foot-in .mono{color:var(--ink-2)}
 
   .divider-note{font-family:var(--mono);font-size:11px;color:var(--ink-3);text-align:center;padding:14px 0;letter-spacing:.04em}
+
+  /* Built-by credit — deliberately muted so it never competes with the brand. */
+  .built-by{display:inline-flex;align-items:center;gap:6px;color:var(--ink-3);
+    font-size:13px;white-space:nowrap}
+  .built-by img{width:18px;height:18px;opacity:.8}
+  .built-by:hover{color:var(--ink);text-decoration:none}
+  .built-by:hover img{opacity:1}
 </style>
 </head>
 <body>
@@ -540,6 +547,12 @@
       <div class="brand" style="font-size:16px"><span class="mark"><i></i><i></i><i></i><i></i></span>Voxa</div>
       <div class="mono">Read-only against CUCM · every call is a read.</div>
       <div><a href="/docs/" style="color:var(--ink-2)">Documentation</a> · © Voxa · on-prem call telemetry</div>
+      <a class="built-by" href="https://rehtacsoftware.com" target="_blank" rel="noopener"
+         aria-label="Website built by Rehtac">
+        <span>Built by</span>
+        <img src="/img/rehtac-mark.png" alt="" width="18" height="18">
+        <span>Rehtac</span>
+      </a>
     </div>
   </footer>
 
