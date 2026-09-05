@@ -1,0 +1,527 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Voxa — read-only CUCM call telemetry</title>
+<meta name="description" content="Voxa turns Cisco Unified Communications Manager into a live phone inventory, a costed refresh plan, and call-quality telemetry — reading everything, writing nothing. On-prem, in your network.">
+<meta property="og:title" content="Voxa — read-only CUCM call telemetry">
+<meta property="og:description" content="Live inventory, refresh planning with PoE budgets, and MOS call quality for Cisco CUCM. Read-only by design. Deployed on your VM.">
+<meta property="og:type" content="website">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+  /* Voxa — committed dark "console" world (the app itself is dark-only).
+     Every colour painted explicitly so the page holds on any host ground. */
+  :root{
+    --bg:#0C0F14; --bg-2:#0F131A; --panel:#161B23; --panel-2:#1B212B;
+    --inset:#11151C;
+    --hair:rgba(255,255,255,.09); --hair-2:rgba(255,255,255,.055);
+    --ink:#EAEEF4; --ink-2:#A2AEBD; --ink-3:#66727F;
+    --cyan:#34D3E6; --cyan-deep:#1FA9BC; --cyan-glow:rgba(52,211,230,.16);
+    --green:#46C98B; --orange:#F2A73C; --red:#F0564C; --blue:#5E9BF7;
+    --mono:'IBM Plex Mono',ui-monospace,Menlo,monospace;
+    --sans:'IBM Plex Sans',system-ui,-apple-system,sans-serif;
+    --disp:'Archivo','IBM Plex Sans',system-ui,sans-serif;
+    --maxw:1140px;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    margin:0; background:var(--bg); color:var(--ink);
+    font-family:var(--sans); font-size:16px; line-height:1.6;
+    -webkit-font-smoothing:antialiased;
+  }
+  @media (prefers-reduced-motion:reduce){ html{scroll-behavior:auto} *{animation:none!important;transition:none!important} }
+  a{color:inherit;text-decoration:none}
+  h1,h2,h3{font-family:var(--disp);font-weight:800;text-wrap:balance;margin:0;letter-spacing:-.02em}
+  .mono{font-family:var(--mono)}
+  .wrap{max-width:var(--maxw);margin:0 auto;padding:0 28px}
+  .eyebrow{
+    font-family:var(--mono);font-size:12px;font-weight:500;letter-spacing:.14em;
+    text-transform:uppercase;color:var(--cyan);
+  }
+
+  /* ---- background grid texture (subtle telemetry field) ---- */
+  .grid-bg{position:fixed;inset:0;z-index:0;pointer-events:none;
+    background:
+      linear-gradient(var(--hair-2) 1px,transparent 1px) 0 0/64px 64px,
+      linear-gradient(90deg,var(--hair-2) 1px,transparent 1px) 0 0/64px 64px;
+    -webkit-mask-image:radial-gradient(ellipse 80% 55% at 50% 0%,#000 0%,transparent 75%);
+            mask-image:radial-gradient(ellipse 80% 55% at 50% 0%,#000 0%,transparent 75%);
+    opacity:.6;
+  }
+  .page{position:relative;z-index:1}
+
+  /* ---- nav ---- */
+  nav{position:sticky;top:0;z-index:20;background:rgba(12,15,20,.78);
+    backdrop-filter:blur(10px);border-bottom:1px solid var(--hair-2)}
+  .nav-in{display:flex;align-items:center;gap:24px;height:64px}
+  .brand{display:flex;align-items:center;gap:11px;font-family:var(--disp);font-weight:800;font-size:19px;letter-spacing:-.01em}
+  .mark{display:flex;align-items:flex-end;gap:2.5px;height:20px}
+  .mark i{width:3.5px;border-radius:1px;background:var(--cyan);display:block}
+  .mark i:nth-child(1){height:9px;opacity:.55} .mark i:nth-child(2){height:16px;opacity:.8}
+  .mark i:nth-child(3){height:12px} .mark i:nth-child(4){height:20px}
+  .nav-links{display:flex;gap:26px;margin-left:12px;font-size:14px;color:var(--ink-2)}
+  .nav-links a:hover{color:var(--ink)}
+  .nav-cta{margin-left:auto;display:flex;gap:12px;align-items:center}
+  .btn{font-family:var(--sans);font-size:14px;font-weight:600;border-radius:8px;
+    padding:10px 16px;cursor:pointer;border:1px solid transparent;display:inline-flex;
+    align-items:center;gap:8px;transition:transform .12s ease,background .15s ease,border-color .15s}
+  .btn:hover{transform:translateY(-1px)}
+  .btn-primary{background:var(--cyan);color:#05252A;font-weight:700}
+  .btn-primary:hover{background:#4ee0f2}
+  .btn-ghost{background:transparent;color:var(--ink);border-color:var(--hair)}
+  .btn-ghost:hover{border-color:var(--cyan);color:var(--cyan)}
+  @media (max-width:760px){.nav-links{display:none}}
+
+  /* ---- hero ---- */
+  .hero{padding:74px 0 40px}
+  .hero-grid{display:grid;grid-template-columns:1.05fr .95fr;gap:52px;align-items:center}
+  @media (max-width:900px){.hero-grid{grid-template-columns:1fr;gap:38px}}
+  .hero h1{font-size:clamp(38px,5.4vw,60px);line-height:1.02}
+  .hero h1 .u{color:var(--cyan)}
+  .hero p.lead{font-size:19px;color:var(--ink-2);max-width:34ch;margin:22px 0 30px}
+  .hero-cta{display:flex;gap:14px;flex-wrap:wrap;align-items:center}
+  .hero-meta{margin-top:26px;display:flex;gap:22px;flex-wrap:wrap;font-family:var(--mono);
+    font-size:12.5px;color:var(--ink-3)}
+  .hero-meta b{color:var(--ink);font-weight:600}
+
+  /* ---- console panel (hero right) ---- */
+  .console{background:linear-gradient(180deg,var(--panel),var(--panel-2));
+    border:1px solid var(--hair);border-radius:16px;overflow:hidden;
+    box-shadow:0 30px 70px -30px rgba(0,0,0,.8),0 0 0 1px rgba(52,211,230,.05)}
+  .console-bar{display:flex;align-items:center;gap:9px;padding:12px 15px;border-bottom:1px solid var(--hair-2);
+    background:var(--inset)}
+  .console-bar .dot{width:9px;height:9px;border-radius:50%}
+  .cluster-pill{margin-left:auto;font-family:var(--mono);font-size:11px;color:var(--ink-2);
+    border:1px solid var(--hair);border-radius:999px;padding:3px 10px;display:flex;gap:7px;align-items:center}
+  .live{width:6px;height:6px;border-radius:50%;background:var(--green);box-shadow:0 0 0 0 rgba(70,201,139,.6);animation:pulse 2.4s infinite}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(70,201,139,.5)}70%{box-shadow:0 0 0 7px rgba(70,201,139,0)}100%{box-shadow:0 0 0 0 rgba(70,201,139,0)}}
+  .console-body{padding:16px}
+  .tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px}
+  .tile{background:var(--inset);border:1px solid var(--hair-2);border-radius:10px;padding:11px 12px}
+  .tile .k{font-family:var(--mono);font-size:9.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3)}
+  .tile .v{font-family:var(--disp);font-weight:700;font-size:22px;line-height:1.15;margin-top:3px}
+  .tile .s{font-size:10.5px;color:var(--ink-3);margin-top:1px}
+  .tbl{border:1px solid var(--hair-2);border-radius:10px;overflow:hidden}
+  .trow{display:grid;grid-template-columns:1.6fr .8fr 68px 54px;gap:8px;align-items:center;
+    padding:9px 12px;font-size:12px;border-top:1px solid var(--hair-2)}
+  .trow:first-child{border-top:none;background:var(--inset);font-family:var(--mono);font-size:9.5px;
+    letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3)}
+  .trow .dev{font-family:var(--mono);color:var(--ink)}
+  .trow .site{color:var(--ink-2)}
+  .pill{font-family:var(--mono);font-size:10px;font-weight:600;padding:2px 7px;border-radius:999px;text-align:center;
+    border:1px solid transparent;white-space:nowrap}
+  .pill.eol{color:var(--red);background:rgba(240,86,76,.13);border-color:rgba(240,86,76,.3)}
+  .pill.eos{color:var(--orange);background:rgba(242,167,60,.13);border-color:rgba(242,167,60,.3)}
+  .pill.cur{color:var(--green);background:rgba(70,201,139,.13);border-color:rgba(70,201,139,.3)}
+  .watt{font-family:var(--mono);color:var(--ink-2);text-align:right;font-size:11.5px}
+
+  /* ---- read-only band ---- */
+  .band{border-top:1px solid var(--hair-2);border-bottom:1px solid var(--hair-2);
+    background:var(--bg-2);margin-top:46px}
+  .band-in{display:grid;grid-template-columns:.9fr 1.1fr;gap:44px;align-items:center;padding:52px 0}
+  @media (max-width:900px){.band-in{grid-template-columns:1fr;gap:28px}}
+  .band .tag{display:inline-flex;align-items:center;gap:8px;font-family:var(--mono);font-size:12px;
+    color:var(--green);border:1px solid rgba(70,201,139,.35);background:rgba(70,201,139,.08);
+    padding:5px 12px;border-radius:999px;margin-bottom:16px}
+  .band h2{font-size:30px}
+  .band p{color:var(--ink-2);margin:14px 0 0;max-width:46ch}
+  .log{background:var(--inset);border:1px solid var(--hair);border-radius:12px;padding:16px 18px;
+    font-family:var(--mono);font-size:12.5px;line-height:1.9;overflow-x:auto}
+  .log .t{color:var(--ink-3)} .log .op{color:var(--cyan)} .log .ok{color:var(--green)}
+  .log .ro{color:var(--ink-2)} .log .no{color:var(--red)}
+
+  /* ---- section scaffolding ---- */
+  section.blk{padding:74px 0}
+  .sec-head{max-width:60ch;margin-bottom:38px}
+  .sec-head h2{font-size:clamp(28px,3.6vw,38px)}
+  .sec-head p{color:var(--ink-2);font-size:17px;margin:14px 0 0}
+
+  /* ---- feature cards ---- */
+  .feats{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  @media (max-width:820px){.feats{grid-template-columns:1fr}}
+  .feat{background:var(--panel);border:1px solid var(--hair);border-radius:14px;padding:22px;
+    display:flex;flex-direction:column;gap:14px;transition:border-color .18s,transform .18s}
+  .feat:hover{border-color:rgba(52,211,230,.35);transform:translateY(-2px)}
+  .feat h3{font-size:19px;font-weight:700}
+  .feat .fx{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--cyan)}
+  .feat p{color:var(--ink-2);font-size:14.5px;margin:0}
+  .widget{margin-top:auto;background:var(--inset);border:1px solid var(--hair-2);border-radius:10px;padding:14px}
+
+  /* poe budget widget */
+  .poe-row{display:flex;justify-content:space-between;font-family:var(--mono);font-size:11px;color:var(--ink-3);margin-bottom:8px}
+  .poe-track{height:12px;border-radius:6px;background:var(--panel-2);overflow:hidden;display:flex}
+  .poe-track i{display:block;height:100%}
+  .poe-legend{display:flex;gap:16px;margin-top:10px;font-family:var(--mono);font-size:11px;color:var(--ink-2)}
+  .poe-legend span{display:flex;align-items:center;gap:6px}
+  .sw{width:9px;height:9px;border-radius:2px;display:inline-block}
+
+  /* mos widget */
+  .mos-head{display:flex;align-items:baseline;gap:10px;margin-bottom:10px}
+  .mos-score{font-family:var(--disp);font-weight:800;font-size:30px;color:var(--green)}
+  .mos-badge{font-family:var(--mono);font-size:11px;font-weight:600;color:var(--green)}
+  .mos-cap{font-size:11px;color:var(--ink-3);margin-left:auto;font-family:var(--mono)}
+  .mos-dist{display:flex;flex-direction:column;gap:5px}
+  .mos-line{display:grid;grid-template-columns:64px 1fr 34px;gap:9px;align-items:center;font-family:var(--mono);font-size:10.5px;color:var(--ink-2)}
+  .mos-bar{height:6px;border-radius:3px;background:var(--panel-2);overflow:hidden}
+  .mos-bar i{display:block;height:100%;border-radius:3px}
+
+  /* ladder widget */
+  .ladder{display:flex;flex-direction:column;gap:0;font-family:var(--mono);font-size:10.5px}
+  .lad-head{display:flex;justify-content:space-between;color:var(--ink-3);margin-bottom:10px}
+  .lad-line{display:grid;grid-template-columns:52px 1fr;gap:10px;align-items:center;padding:3px 0}
+  .lad-line .t{color:var(--ink-3)}
+  .arrow{position:relative;height:16px}
+  .arrow:before{content:"";position:absolute;top:50%;left:0;right:14px;height:1.5px;background:var(--c,var(--blue))}
+  .arrow:after{content:"";position:absolute;top:50%;right:8px;transform:translateY(-50%);
+    border-left:7px solid var(--c,var(--blue));border-top:4px solid transparent;border-bottom:4px solid transparent}
+  .arrow .lbl{position:absolute;top:-8px;left:8px;color:var(--c,var(--blue));font-size:9.5px;background:var(--inset);padding:0 4px}
+
+  /* cert widget */
+  .cert{display:flex;flex-direction:column;gap:8px}
+  .cert-row{display:grid;grid-template-columns:1fr auto auto;gap:10px;align-items:center;font-family:var(--mono);font-size:11px}
+  .cert-row .cn{color:var(--ink-2)}
+  .cert-exp{font-size:10px}
+
+  /* ---- how it works ---- */
+  .how{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;counter-reset:step}
+  @media (max-width:820px){.how{grid-template-columns:1fr}}
+  .step{background:var(--panel);border:1px solid var(--hair);border-radius:14px;padding:24px;position:relative}
+  .step .n{font-family:var(--mono);font-size:12px;color:var(--cyan);border:1px solid rgba(52,211,230,.3);
+    width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;margin-bottom:16px}
+  .step h3{font-size:17px;font-weight:700;margin-bottom:8px}
+  .step p{color:var(--ink-2);font-size:14px;margin:0}
+  .step code{font-family:var(--mono);font-size:12px;color:var(--cyan);background:var(--inset);
+    padding:2px 7px;border-radius:6px;border:1px solid var(--hair-2)}
+
+  /* ---- pricing ---- */
+  .price{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;align-items:stretch}
+  @media (max-width:820px){.price{grid-template-columns:1fr}}
+  .plan{position:relative;background:var(--panel);border:1px solid var(--hair);border-radius:16px;padding:26px;display:flex;flex-direction:column;gap:16px}
+  .plan.feat-plan{border-color:var(--cyan);box-shadow:0 0 0 1px var(--cyan),0 24px 60px -34px rgba(52,211,230,.4)}
+  .plan .badge{position:absolute;font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;
+    color:#05252A;background:var(--cyan);padding:3px 10px;border-radius:999px;transform:translateY(-38px)}
+  .plan h3{font-size:20px;font-weight:700}
+  .plan .scale{font-family:var(--mono);font-size:12.5px;color:var(--cyan)}
+  .plan .desc{color:var(--ink-2);font-size:13.5px;min-height:38px}
+  .plan ul{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:9px}
+  .plan li{display:flex;gap:9px;font-size:14px;color:var(--ink)}
+  .plan li svg{flex:none;margin-top:3px}
+  .plan .foot{margin-top:auto}
+  .plan .foot .price-note{font-family:var(--mono);font-size:11.5px;color:var(--ink-3);margin-bottom:12px}
+
+  /* ---- final cta ---- */
+  .final{border:1px solid var(--hair);border-radius:20px;background:
+    radial-gradient(120% 140% at 50% -10%,rgba(52,211,230,.14),transparent 60%),var(--panel);
+    padding:56px 32px;text-align:center;margin-bottom:12px}
+  .final h2{font-size:clamp(28px,3.8vw,40px)}
+  .final p{color:var(--ink-2);font-size:17px;max-width:52ch;margin:16px auto 26px}
+  .final .hero-cta{justify-content:center}
+
+  footer{border-top:1px solid var(--hair-2);margin-top:20px;padding:34px 0 48px;color:var(--ink-3);font-size:13px}
+  .foot-in{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap;align-items:center}
+  .foot-in .mono{color:var(--ink-2)}
+
+  .divider-note{font-family:var(--mono);font-size:11px;color:var(--ink-3);text-align:center;padding:14px 0;letter-spacing:.04em}
+</style>
+</head>
+<body>
+
+<div class="grid-bg"></div>
+<div class="page">
+
+  <nav>
+    <div class="wrap nav-in">
+      <div class="brand"><span class="mark"><i></i><i></i><i></i><i></i></span>Voxa</div>
+      <div class="nav-links">
+        <a href="#features">Platform</a>
+        <a href="#how">How it works</a>
+        <a href="#pricing">Pricing</a>
+        <a href="#trust">Security</a>
+        <a href="/docs/">Docs</a>
+      </div>
+      <div class="nav-cta">
+        <a class="btn btn-ghost" href="#pricing">Request a quote</a>
+        <a class="btn btn-primary" href="#demo">Request a demo</a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- HERO -->
+  <header class="hero">
+    <div class="wrap hero-grid">
+      <div>
+        <div class="eyebrow">CUCM telemetry &amp; phone-refresh planning</div>
+        <h1>Know every phone.<br><span class="u">Never touch the switch.</span></h1>
+        <p class="lead">Voxa turns your Cisco Unified Communications Manager into a live
+          inventory, a costed refresh plan, and call-quality telemetry — reading everything,
+          writing nothing.</p>
+        <div class="hero-cta">
+          <a class="btn btn-primary" href="#demo">Request a demo</a>
+          <a class="btn btn-ghost" href="#how">See how it works</a>
+        </div>
+        <div class="hero-meta">
+          <span><b>Read-only</b> against CUCM</span>
+          <span><b>On-prem</b> in your network</span>
+          <span><b>No agents</b> on phones</span>
+        </div>
+      </div>
+
+      <!-- live console -->
+      <div class="console" aria-hidden="true">
+        <div class="console-bar">
+          <span class="dot" style="background:var(--red)"></span>
+          <span class="dot" style="background:var(--orange)"></span>
+          <span class="dot" style="background:var(--green)"></span>
+          <span class="cluster-pill"><span class="live"></span>cucm-pub &middot; AXL &middot; RIS</span>
+        </div>
+        <div class="console-body">
+          <div class="tiles">
+            <div class="tile"><div class="k">Phones</div><div class="v">1,622</div><div class="s">14 models · 5 sites</div></div>
+            <div class="tile"><div class="k">Past support</div><div class="v" style="color:var(--red)">318</div><div class="s">replace first</div></div>
+            <div class="tile"><div class="k">Registered</div><div class="v" style="color:var(--green)">96%</div><div class="s">live via RisPort</div></div>
+          </div>
+          <div class="tbl">
+            <div class="trow"><span>Device</span><span>Site</span><span>Model</span><span style="text-align:right">Life</span></div>
+            <div class="trow"><span class="dev">SEP001122334455</span><span class="site">HQ · IDF-3</span><span class="mono" style="color:var(--ink-2)">8811</span><span class="pill cur">CUR</span></div>
+            <div class="trow"><span class="dev">SEP00AABBCCDDEE</span><span class="site">HQ · IDF-1</span><span class="mono" style="color:var(--ink-2)">7841</span><span class="pill cur">CUR</span></div>
+            <div class="trow"><span class="dev">SEP0026CB3B0A67</span><span class="site">Plant · MDF</span><span class="mono" style="color:var(--ink-2)">7962</span><span class="pill eos">EOS</span></div>
+            <div class="trow"><span class="dev">SEP0009B78143C5</span><span class="site">Plant · IDF-2</span><span class="mono" style="color:var(--ink-2)">7940</span><span class="pill eol">EOL</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- READ-ONLY TRUST BAND -->
+  <div class="band" id="trust">
+    <div class="wrap band-in">
+      <div>
+        <span class="tag">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="var(--green)"><path d="M12 1.5 4 5v6.4c0 5 3.4 9.6 8 11.1 4.6-1.5 8-6.1 8-11.1V5l-8-3.5Zm-1 14.6-3.2-3.2 1.4-1.4L11 13.3l4.8-4.8 1.4 1.4-6.2 6.2Z"/></svg>
+          Read-only by design
+        </span>
+        <h2>The one property that gets it approved.</h2>
+        <p>Every CUCM interaction is a read — AXL SQL queries, RisPort registration
+          lookups, the phones' own web pages. Nothing is ever written back. That's why
+          your voice team can point Voxa at a production cluster, and the log proves it.</p>
+      </div>
+      <div class="log" role="img" aria-label="Sample application log showing only read operations against CUCM">
+        <div><span class="t">10:42:07</span> <span class="op">AXL</span> executeSQLQuery <span class="ro">device, typemodel</span> → <span class="ok">1,622 rows · READ</span></div>
+        <div><span class="t">10:42:09</span> <span class="op">RIS</span> selectCmDeviceExt <span class="ro">registration state</span> → <span class="ok">1,558 up · READ</span></div>
+        <div><span class="t">10:42:11</span> <span class="op">WEB</span> DeviceInformationX <span class="ro">serial, CDP neighbour</span> → <span class="ok">READ</span></div>
+        <div><span class="t">10:42:11</span> <span class="op">AXL</span> update / insert / delete <span class="no">— never issued</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FEATURES -->
+  <section class="blk" id="features">
+    <div class="wrap">
+      <div class="sec-head">
+        <div class="eyebrow">One platform</div>
+        <h2>Inventory, refresh plan, and call quality — in one read-only view.</h2>
+        <p>Voxa merges three sources CUCM keeps apart — configuration, live registration, and
+          each phone's own web server — into one picture your team can actually plan from.</p>
+      </div>
+
+      <div class="feats">
+        <!-- Inventory / refresh -->
+        <div class="feat">
+          <div class="fx">Fleet</div>
+          <h3>Live inventory &amp; refresh plan</h3>
+          <p>Every phone, its model lifecycle, the switch port it sits on, and what it maps to
+            next — filterable, exportable, and current on every collection.</p>
+          <div class="widget">
+            <div class="poe-row"><span>PoE budget · IDF-3 · 48-port</span><span>after refresh</span></div>
+            <div class="poe-track">
+              <i style="width:22%;background:var(--green)"></i>
+              <i style="width:31%;background:var(--orange)"></i>
+              <i style="width:12%;background:var(--red)"></i>
+              <i style="width:35%;background:var(--panel-2)"></i>
+            </div>
+            <div class="poe-legend">
+              <span><i class="sw" style="background:var(--green)"></i>Class 3 · 12.95W</span>
+              <span><i class="sw" style="background:var(--orange)"></i>Class 4 · 25.5W</span>
+              <span style="color:var(--ink-3)">headroom</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Call telemetry / MOS -->
+        <div class="feat">
+          <div class="fx">Telemetry</div>
+          <h3>Call detail &amp; MOS quality</h3>
+          <p>Ingest CDR/CMR straight from your billing server. Search calls, trace them
+            cradle-to-grave, and score voice quality with real MOS — pulled from the phones'
+            own K-factor metrics.</p>
+          <div class="widget">
+            <div class="mos-head">
+              <span class="mos-score">4.03</span><span class="mos-badge">GOOD</span>
+              <span class="mos-cap">2,846 legs</span>
+            </div>
+            <div class="mos-dist">
+              <div class="mos-line"><span>Excellent</span><div class="mos-bar"><i style="width:29%;background:var(--green)"></i></div><span>29%</span></div>
+              <div class="mos-line"><span>Good</span><div class="mos-bar"><i style="width:54%;background:#6fd6a2"></i></div><span>54%</span></div>
+              <div class="mos-line"><span>Fair</span><div class="mos-bar"><i style="width:9%;background:var(--orange)"></i></div><span>9%</span></div>
+              <div class="mos-line"><span>Poor · Bad</span><div class="mos-bar"><i style="width:8%;background:var(--red)"></i></div><span>8%</span></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Cradle to grave -->
+        <div class="feat">
+          <div class="fx">Trace</div>
+          <h3>Cradle-to-grave &amp; SIP ladder</h3>
+          <p>Follow any call across every leg and CallManager node, with a signalling ladder
+            and the packet-loss, jitter and codec behind a bad one.</p>
+          <div class="widget">
+            <div class="ladder">
+              <div class="lad-head"><span>7368</span><span>CUCM&nbsp;3</span><span>7378</span></div>
+              <div class="lad-line"><span class="t">3:46:31</span><span class="arrow" style="--c:var(--blue)"><span class="lbl">INVITE</span></span></div>
+              <div class="lad-line"><span class="t">3:46:38</span><span class="arrow" style="--c:var(--green)"><span class="lbl">200 OK</span></span></div>
+              <div class="lad-line"><span class="t">3:46:53</span><span class="arrow" style="--c:var(--orange)"><span class="lbl">BYE · 15s</span></span></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Certs + AD -->
+        <div class="feat">
+          <div class="fx">Operations</div>
+          <h3>Certificates &amp; AD sign-in</h3>
+          <p>Watch expiry on every CUCM and CUBE certificate before it drops a trunk. Sign in
+            with Active Directory, with a local break-glass account that always works.</p>
+          <div class="widget">
+            <div class="cert">
+              <div class="cert-row"><span class="cn">CN=cucm-pub · Tomcat 8443</span><span class="pill cur">CA</span><span class="cert-exp" style="color:var(--green)">412d</span></div>
+              <div class="cert-row"><span class="cn">CN=cube-hq · SIP-TLS 5061</span><span class="pill eos">self</span><span class="cert-exp" style="color:var(--orange)">58d</span></div>
+              <div class="cert-row"><span class="cn">CN=cucm-sub2 · CAPF 2443</span><span class="pill eol">exp</span><span class="cert-exp" style="color:var(--red)">−3d</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- HOW IT WORKS -->
+  <section class="blk" id="how" style="background:var(--bg-2);border-top:1px solid var(--hair-2);border-bottom:1px solid var(--hair-2)">
+    <div class="wrap">
+      <div class="sec-head">
+        <div class="eyebrow">On your terms, on your network</div>
+        <h2>Deployed on your VM in an afternoon.</h2>
+        <p>Voxa runs on-prem — a single Docker stack behind your own TLS. It never leaves your
+          network, so it can reach CUCM, the phones, and your switches directly.</p>
+      </div>
+      <div class="how">
+        <div class="step">
+          <div class="n">1</div>
+          <h3>Install</h3>
+          <p>Load the image, run <code>./install.sh</code>. It generates secrets, drops in TLS,
+            and starts the stack. A browser wizard creates your admin.</p>
+        </div>
+        <div class="step">
+          <div class="n">2</div>
+          <h3>Connect</h3>
+          <p>Point Voxa at your publisher with a <strong>read-only</strong> service account.
+            One connection covers the whole cluster; subscribers are discovered.</p>
+        </div>
+        <div class="step">
+          <div class="n">3</div>
+          <h3>Collect</h3>
+          <p>Voxa reads configuration, live registration, and each phone's web page — no agents,
+            no writes. CDR flows in on a schedule from your billing server.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- PRICING -->
+  <section class="blk" id="pricing">
+    <div class="wrap">
+      <div class="sec-head">
+        <div class="eyebrow">Pricing</div>
+        <h2>Priced by fleet size. Licensed to you.</h2>
+        <p>A perpetual, on-prem license sized to your phone count — no per-seat metering, no
+          phoning home. Annual support and updates included. Talk to us for a quote.</p>
+      </div>
+      <div class="price">
+        <div class="plan">
+          <h3>Starter</h3>
+          <div class="scale">up to 1,000 phones</div>
+          <div class="desc">Single cluster. For a focused site or a first refresh project.</div>
+          <ul>
+            <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--cyan)" stroke-width="2.4"><path d="M4 12l5 5L20 6"/></svg>Live inventory &amp; refresh plan</li>
+            <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--cyan)" stroke-width="2.4"><path d="M4 12l5 5L20 6"/></svg>PoE budgeting &amp; CSV export</li>
+            <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--cyan)" stroke-width="2.4"><path d="M4 12l5 5L20 6"/></svg>Local &amp; AD sign-in</li>
+          </ul>
+          <div class="foot">
+            <div class="price-note">annual license &amp; support</div>
+            <a class="btn btn-ghost" href="#demo" style="width:100%;justify-content:center">Request a quote</a>
+          </div>
+        </div>
+
+        <div class="plan feat-plan">
+          <span class="badge">Most chosen</span>
+          <h3>Standard</h3>
+          <div class="scale">up to 5,000 phones</div>
+          <div class="desc">Everything in Starter, plus full call telemetry and certificate monitoring.</div>
+          <ul>
+            <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--cyan)" stroke-width="2.4"><path d="M4 12l5 5L20 6"/></svg>CDR/CMR ingest &amp; MOS scoring</li>
+            <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--cyan)" stroke-width="2.4"><path d="M4 12l5 5L20 6"/></svg>Cradle-to-grave call traces</li>
+            <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--cyan)" stroke-width="2.4"><path d="M4 12l5 5L20 6"/></svg>Certificate &amp; CUBE monitoring</li>
+            <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--cyan)" stroke-width="2.4"><path d="M4 12l5 5L20 6"/></svg>Reports engine (CSV / XLSX / PDF)</li>
+          </ul>
+          <div class="foot">
+            <div class="price-note">annual license &amp; support</div>
+            <a class="btn btn-primary" href="#demo" style="width:100%;justify-content:center">Request a quote</a>
+          </div>
+        </div>
+
+        <div class="plan">
+          <h3>Enterprise</h3>
+          <div class="scale">unlimited · multi-cluster</div>
+          <div class="desc">Many clusters, many sites. SSO, JSON API and webhooks, priority support.</div>
+          <ul>
+            <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--cyan)" stroke-width="2.4"><path d="M4 12l5 5L20 6"/></svg>Unlimited phones &amp; clusters</li>
+            <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--cyan)" stroke-width="2.4"><path d="M4 12l5 5L20 6"/></svg>Read-only JSON API &amp; webhooks</li>
+            <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--cyan)" stroke-width="2.4"><path d="M4 12l5 5L20 6"/></svg>Priority support &amp; onboarding</li>
+          </ul>
+          <div class="foot">
+            <div class="price-note">annual license &amp; support</div>
+            <a class="btn btn-ghost" href="#demo" style="width:100%;justify-content:center">Talk to sales</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FINAL CTA -->
+  <section class="blk" id="demo" style="padding-top:20px">
+    <div class="wrap">
+      <div class="final">
+        <div class="eyebrow" style="justify-content:center">See it against your cluster</div>
+        <h2>Bring your CUCM. We'll read it — nothing else.</h2>
+        <p>A 30-minute demo on a live cluster, or a sandbox seeded with 600 phones. Watch Voxa
+          build a full inventory and refresh plan while writing exactly zero rows.</p>
+        <div class="hero-cta">
+          <a class="btn btn-primary" href="mailto:hello@voxa.example?subject=Voxa%20demo">Request a demo</a>
+          <a class="btn btn-ghost" href="#pricing">See pricing</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <div class="wrap foot-in">
+      <div class="brand" style="font-size:16px"><span class="mark"><i></i><i></i><i></i><i></i></span>Voxa</div>
+      <div class="mono">Read-only against CUCM · every call is a read.</div>
+      <div><a href="/docs/" style="color:var(--ink-2)">Documentation</a> · © Voxa · on-prem call telemetry</div>
+    </div>
+  </footer>
+
+</div>
+</body>
+</html>

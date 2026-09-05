@@ -28,3 +28,5 @@ dist/
 # Local CDR/CMR drop dir (sample + real files)
 cdr-inbox/*
 !cdr-inbox/.gitkeep
+.firebase/
+firebase-debug.log
