@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Set up {{ app_name }}</title>
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body class="login-page">
+  <div class="login-card" style="max-width:440px">
+    <div class="brand">
+      <div class="brand-mark">
+        <div class="bars"><i></i><i></i><i></i><i></i></div>
+      </div>
+      <div>
+        <div class="brand-name">{{ app_name }}</div>
+        <div class="brand-sub">First-run setup</div>
+      </div>
+    </div>
+
+    <div class="setup-steps">
+      <span class="step on">1 · Create admin</span>
+      <span class="step">2 · Connect CUCM</span>
+    </div>
+
+    <p class="setup-lead">Welcome. Create the first administrator account. You'll
+      connect it to your Call Manager cluster in the next step — nothing is written
+      to CUCM, ever.</p>
+
+    {% if error %}
+    <div class="errbox" style="margin-bottom:14px">{{ error }}</div>
+    {% endif %}
+
+    <form method="post" action="/setup" style="display:flex;flex-direction:column;gap:14px">
+      <div class="field">
+        <label for="display_name">Your name</label>
+        <input type="text" id="display_name" name="display_name"
+               autocomplete="name" placeholder="Jane Admin">
+      </div>
+      <div class="field">
+        <label for="username">Username</label>
+        <input type="text" id="username" name="username"
+               autocomplete="username" placeholder="admin" autofocus required>
+      </div>
+      <div class="field">
+        <label for="password">Password</label>
+        <input type="password" id="password" name="password"
+               autocomplete="new-password" placeholder="at least 8 characters" required>
+      </div>
+      <div class="field">
+        <label for="confirm">Confirm password</label>
+        <input type="password" id="confirm" name="confirm"
+               autocomplete="new-password" required>
+      </div>
+      <button class="btn btn-primary" type="submit" style="justify-content:center">
+        Create admin &amp; continue
+      </button>
+    </form>
+
+    <div class="setup-foot">This account is a local <strong>break-glass</strong>
+      admin. You can switch sign-in to Active Directory later in Settings — this
+      account keeps working even if the directory is unreachable.</div>
+  </div>
+</body>
+</html>

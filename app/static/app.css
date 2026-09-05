@@ -1802,3 +1802,15 @@ th.sortable a:hover { color: var(--cyan); }
   content: ""; position: absolute; top: 0; right: 0; bottom: 0; width: 1px;
   background: var(--hairline-soft);
 }
+
+/* First-run setup wizard. */
+.setup-steps { display: flex; gap: 8px; margin-bottom: 16px; }
+.setup-steps .step {
+  font-size: 11px; font-weight: 700; letter-spacing: .04em; padding: 4px 10px;
+  border-radius: var(--radius-pill); color: var(--ink-3);
+  background: var(--surface-inset); border: 1px solid var(--hairline-soft);
+}
+.setup-steps .step.on { color: var(--cyan); border-color: color-mix(in srgb, var(--cyan) 40%, transparent); }
+.setup-lead { font-size: 13px; color: var(--ink-2); line-height: 1.5; margin: 0 0 18px; }
+.setup-foot { font-size: 11.5px; color: var(--ink-3); line-height: 1.5; margin-top: 16px;
+  padding-top: 14px; border-top: 1px solid var(--hairline-soft); }

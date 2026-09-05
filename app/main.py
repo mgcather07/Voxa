@@ -13,6 +13,7 @@ from functools import lru_cache
 from hashlib import sha256
 from pathlib import Path
 from types import SimpleNamespace
+from urllib.parse import quote_plus
 from zoneinfo import ZoneInfo
 
 from fastapi import (
@@ -56,6 +57,7 @@ from .catalog import DEFAULT_FAMILY, FAMILIES, get_catalog, reapply_to_phones
 from .auth import (
     RedirectToLogin,
     get_backend,
+    hash_password,
     login_user,
     logout_user,
     redirect_to_login,
@@ -380,8 +382,70 @@ def _ctx(request: Request, session: Session, user: User | None = None, **extra) 
 # ---------------------------------------------------------------------------
 # Login / logout
 # ---------------------------------------------------------------------------
+def _needs_setup(session: Session) -> bool:
+    """True when no account exists yet — first run. Drives the setup wizard so a
+    customer creates the first admin in the browser instead of over SSH."""
+    return (session.scalar(select(func.count()).select_from(User)) or 0) == 0
+
+
+@app.get("/setup", response_class=HTMLResponse)
+def setup_form(request: Request, error: str = "",
+               session: Session = Depends(get_session)):
+    # Once any account exists the wizard is closed for good — it can never be
+    # used to mint an extra admin on a running system.
+    if not _needs_setup(session):
+        return RedirectResponse(url="/login", status_code=303)
+    return templates.TemplateResponse(
+        "setup.html",
+        {"request": request, "settings": settings, "error": error,
+         "app_name": settings_store.load(session).app_name},
+    )
+
+
+@app.post("/setup")
+def setup_submit(
+    request: Request,
+    display_name: str = Form(""),
+    username: str = Form(...),
+    password: str = Form(...),
+    confirm: str = Form(...),
+    session: Session = Depends(get_session),
+):
+    if not _needs_setup(session):  # race / re-post guard
+        return RedirectResponse(url="/login", status_code=303)
+    uname = username.strip().lower()
+    err = None
+    if len(uname) < 3:
+        err = "Username must be at least 3 characters."
+    elif len(password) < 8:
+        err = "Password must be at least 8 characters."
+    elif password != confirm:
+        err = "Passwords do not match."
+    if err:
+        return RedirectResponse(url=f"/setup?error={quote_plus(err)}", status_code=303)
+
+    admin = User(
+        username=uname,
+        display_name=display_name.strip() or uname,
+        password_hash=hash_password(password),
+        is_admin=True, is_active=True, source="local",
+    )
+    session.add(admin)
+    session.commit()
+    login_user(request, admin)
+    admin.last_login = utcnow()
+    session.commit()
+    log.info("First-run setup: admin %r created from %s",
+             uname, request.client.host)
+    return RedirectResponse(url="/settings?welcome=1", status_code=303)
+
+
 @app.get("/login", response_class=HTMLResponse)
-def login_form(request: Request, next: str = "/", error: str = ""):
+def login_form(request: Request, next: str = "/", error: str = "",
+               session: Session = Depends(get_session)):
+    # No accounts yet → send the very first visitor to the setup wizard.
+    if not settings.auth_disabled and _needs_setup(session):
+        return RedirectResponse(url="/setup", status_code=303)
     return templates.TemplateResponse(
         "login.html",
         {
