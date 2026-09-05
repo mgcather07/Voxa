@@ -335,12 +335,44 @@ def _cdr_scheduler_loop() -> None:
         time.sleep(interval * 60 if interval else 60)
 
 
+class UnsafeProductionConfig(RuntimeError):
+    """Refuse to serve a production instance in a wide-open configuration."""
+
+
+def _enforce_production_safety(settings) -> None:
+    """Fail fast rather than silently run insecure in production. VOXA_ENV
+    defaults to production, so a customer who does nothing gets the strict
+    checks; the dev stack opts out with VOXA_ENV=development."""
+    if not settings.is_production:
+        return
+    problems = []
+    if settings.auth_disabled:
+        problems.append(
+            "AUTH_DISABLED=true would serve every request as admin with no "
+            "login. Never set it in production."
+        )
+    if settings.secret_is_default:
+        problems.append(
+            "SECRET_KEY is the built-in default — session cookies would be "
+            "forgeable. Set a strong SECRET_KEY (install.sh generates one)."
+        )
+    if problems:
+        detail = "\n  - ".join(problems)
+        log.critical("Refusing to start (VOXA_ENV=%s):\n  - %s",
+                     settings.voxa_env, detail)
+        raise UnsafeProductionConfig(
+            "Unsafe production configuration:\n  - " + detail +
+            "\n(Set VOXA_ENV=development only for local testing.)"
+        )
+
+
 @app.on_event("startup")
 def _startup() -> None:
     init_db()
     threading.Thread(
         target=_cdr_scheduler_loop, name="cdr-scheduler", daemon=True
     ).start()
+    _enforce_production_safety(settings)
     if settings.secret_is_default and not settings.auth_disabled:
         log.warning(
             "SECRET_KEY is still the built-in default. Session cookies are "
@@ -349,7 +381,7 @@ def _startup() -> None:
         )
     if settings.auth_disabled:
         log.warning("AUTH_DISABLED=true - every request is treated as admin.")
-    log.info("Database ready")
+    log.info("Database ready (env=%s)", settings.voxa_env)
 
 
 def _latest_run(session: Session) -> SyncRun | None:

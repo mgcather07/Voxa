@@ -33,6 +33,11 @@ class Settings(BaseSettings):
         "postgresql+psycopg://voxa:voxa@localhost:5433/voxa"
     )
 
+    # Deployment environment. "production" (the safe default) enforces the
+    # boot-time guards in app.main: no AUTH_DISABLED, no default SECRET_KEY.
+    # The dev stack sets VOXA_ENV=development to relax them.
+    voxa_env: str = "production"
+
     # App behaviour
     app_name: str = "Voxa"
     # IANA timezone for DISPLAYING timestamps (storage stays UTC). e.g.
@@ -96,6 +101,10 @@ class Settings(BaseSettings):
     @property
     def secret_is_default(self) -> bool:
         return self.secret_key == "dev-only-insecure-key-change-me"
+
+    @property
+    def is_production(self) -> bool:
+        return self.voxa_env.strip().lower() not in {"development", "dev", "local"}
 
 
 @lru_cache

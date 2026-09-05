@@ -37,6 +37,7 @@ services:
       - drummondco.net
     environment:
       DATABASE_URL: postgresql+psycopg://voxa:voxa@db:5432/voxa
+      VOXA_ENV: development       # relaxes prod boot guards (allows AUTH_DISABLED)
       AUTH_DISABLED: "true"       # local only — skip login
       MOCK_MODE: "true"           # never call a real CUCM from a dev box
       SECRET_KEY: dev-only-insecure
