@@ -166,6 +166,8 @@ bundle:
 	chmod +x                   $(DIST)/voxa-deploy-$(VERSION)/install.sh
 	cp deploy/SERVER.md        $(DIST)/voxa-deploy-$(VERSION)/README.md
 	cp docs/UPGRADE.md         $(DIST)/voxa-deploy-$(VERSION)/docs/
+	cp docs/ADMIN-GUIDE.md     $(DIST)/voxa-deploy-$(VERSION)/docs/
+	cp docs/CUCM-SETUP.md      $(DIST)/voxa-deploy-$(VERSION)/docs/
 	cp docs/DEPLOY.md          $(DIST)/voxa-deploy-$(VERSION)/docs/ 2>/dev/null || true
 	touch $(DIST)/voxa-deploy-$(VERSION)/deploy/certs/.gitkeep
 	cd $(DIST) && tar czf voxa-deploy-$(VERSION).tar.gz voxa-deploy-$(VERSION)
