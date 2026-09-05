@@ -16,11 +16,13 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /srv/app
 
-# Dependencies first so code edits do not invalidate the layer. The SFTP extra
-# (paramiko) is baked in because CDR-over-SFTP is a first-class feature here;
-# it stays in its own requirements file so other deployments can omit it.
-COPY requirements.txt requirements-sftp.txt ./
-RUN pip install --no-cache-dir -r requirements.txt -r requirements-sftp.txt
+# Dependencies first so code edits do not invalidate the layer. The SFTP
+# (paramiko) and LDAP (ldap3) extras are baked in — CDR-over-SFTP and Active
+# Directory login are first-class product features; they stay in their own
+# requirements files so a stripped-down build can omit them.
+COPY requirements.txt requirements-sftp.txt requirements-ldap.txt ./
+RUN pip install --no-cache-dir \
+    -r requirements.txt -r requirements-sftp.txt -r requirements-ldap.txt
 
 COPY app ./app
 COPY config ./config

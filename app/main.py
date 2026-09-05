@@ -61,6 +61,7 @@ from .auth import (
     redirect_to_login,
     require_admin,
     require_user,
+    test_ldap,
 )
 from .config import get_settings
 from .db import engine, get_session, init_db, session_scope
@@ -1359,6 +1360,24 @@ async def sftp_pull(
     log.info("CDR SFTP pull by %s: %s", user.username, result.get("message"))
     return templates.TemplateResponse(
         "settings.html", _settings_ctx(request, session, user, sftp_result=result)
+    )
+
+
+@app.post("/settings/ldap/test", response_class=HTMLResponse)
+def settings_ldap_test(
+    request: Request,
+    test_username: str = Form(""),
+    test_password: str = Form(""),
+    session: Session = Depends(get_session),
+    user: User = Depends(require_admin),
+):
+    """Step-by-step check of the SAVED LDAP settings — read-only against the
+    directory. The test password (if given) is used for one bind and dropped."""
+    results = test_ldap(session, test_username, test_password)
+    log.info("LDAP test by %s: %s", user.username,
+             [(r["ok"], r["check"]) for r in results])
+    return templates.TemplateResponse(
+        "settings.html", _settings_ctx(request, session, user, ldap_test=results)
     )
 
 

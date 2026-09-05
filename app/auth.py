@@ -117,20 +117,21 @@ class LocalAuthBackend:
 
 
 class LdapAuthBackend:
-    """Active Directory bind. NOT IMPLEMENTED YET - see docs/ROADMAP.md.
+    """Active Directory / LDAP bind authentication.
 
-    The intended shape, so nothing else has to change when it lands:
+    The flow (configured in Settings → LDAP / Active Directory):
 
-      1. Bind to LDAP_URL as LDAP_BIND_DN / LDAP_BIND_PASSWORD.
-      2. Search LDAP_USER_BASE_DN for (sAMAccountName={username}).
+      1. Bind to ldap_url as ldap_bind_dn / ldap_bind_password (service acct).
+      2. Search ldap_user_base_dn with ldap_user_filter for the username.
       3. Re-bind as that user's DN with the supplied password. Success there
-         is the authentication - we never see or store the password.
-      4. Check group membership against LDAP_REQUIRED_GROUP.
+         is the authentication — the AD password is never seen again or stored.
+      4. Optionally require membership of ldap_required_group.
       5. Upsert a local User row with source="ldap" and no password_hash, so
          the rest of the app (audit trail, admin flags) works identically.
 
-    Add `ldap3` to requirements.txt when implementing. Keep LocalAuthBackend
-    reachable as a break-glass path for when AD is unreachable.
+    Deployed behind ChainedAuthBackend, which checks local accounts first —
+    the break-glass path that keeps admins able to sign in when every domain
+    controller is unreachable. ldap3 ships in the image (requirements-ldap.txt).
     """
 
     name = "ldap"
@@ -209,23 +210,62 @@ class LdapAuthBackend:
                 log.warning("LDAP user %r not in required group", username)
                 return None
         except LDAPException as exc:  # pragma: no cover - env dependent
+            # Directory unreachable / service bind rejected. Details go to the
+            # log; the login page gets a clean message. Local break-glass
+            # accounts were already tried by ChainedAuthBackend.
             log.error("LDAP error authenticating %r: %s", username, exc)
-            raise NotImplementedError(f"LDAP error: {exc}") from exc
+            raise NotImplementedError(
+                "Active Directory sign-in is unavailable (directory unreachable "
+                "or service account rejected — see the server log). Local "
+                "break-glass accounts still work."
+            ) from exc
 
         # 4. Upsert a local shadow account (source=ldap, no password stored) so
         #    the rest of the app — audit trail, admin flags — works identically.
         uname = username.strip().lower()
         user = session.scalars(select(User).where(User.username == uname)).first()
+        # An account an admin deactivated stays locked out — a successful
+        # directory bind does not override it.
+        if user is not None and not user.is_active:
+            return None
         if user is None:
-            user = User(username=uname, source="ldap", is_admin=False)
+            # is_active is set explicitly: the column default only applies at
+            # flush, and checking the un-flushed None here rejected every AD
+            # user's FIRST login (caught by the backend test).
+            user = User(username=uname, source="ldap", is_admin=False,
+                        is_active=True)
             session.add(user)
         user.display_name = display
         user.email = email
         user.source = "ldap"
-        if not user.is_active:
-            return None
         session.commit()
         return user
+
+
+class ChainedAuthBackend:
+    """LDAP with a local break-glass path.
+
+    Local accounts (rows with a password hash in our own database) are checked
+    FIRST, so an admin can always sign in even when every domain controller is
+    down or LDAP is misconfigured. Anything that isn't a local match falls
+    through to the directory. LDAP shadow accounts carry no password hash, so
+    they can never match the local step — there is no way to bypass AD with a
+    guessed local password for a directory user.
+    """
+
+    name = "ldap+local"
+
+    def __init__(self, local: LocalAuthBackend, ldap: LdapAuthBackend) -> None:
+        self.local = local
+        self.ldap = ldap
+
+    def authenticate(
+        self, session: Session, username: str, password: str
+    ) -> User | None:
+        user = self.local.authenticate(session, username, password)
+        if user is not None:
+            return user
+        return self.ldap.authenticate(session, username, password)
 
 
 def get_backend(settings: Settings | None = None) -> AuthBackend:
@@ -233,8 +273,100 @@ def get_backend(settings: Settings | None = None) -> AuthBackend:
 
     settings = settings or get_settings()
     if settings_store.load().auth_backend == "ldap":
-        return LdapAuthBackend(settings)
+        return ChainedAuthBackend(LocalAuthBackend(), LdapAuthBackend(settings))
     return LocalAuthBackend()
+
+
+def test_ldap(session: Session, test_username: str, test_password: str = "") -> list[dict]:
+    """Step-by-step LDAP configuration check for the Settings page.
+
+    Uses the SAVED LDAP settings. Read-only against the directory: a service
+    bind, a user search, and (only if a test password was supplied) a bind as
+    that user. Returns [{ok, check, detail}, ...] — the same shape the cluster
+    connection test renders.
+    """
+    checks: list[dict] = []
+
+    def add(ok: bool, check: str, detail: str) -> None:
+        checks.append({"ok": ok, "check": check, "detail": detail})
+
+    try:
+        import ldap3
+        from ldap3.core.exceptions import LDAPException
+        from ldap3.utils.conv import escape_filter_chars
+    except ImportError:
+        add(False, "ldap3 installed", "pip install -r requirements-ldap.txt")
+        return checks
+    add(True, "ldap3 installed", ldap3.version.__version__)
+
+    from . import settings_store
+
+    s = settings_store.load(session)
+    missing = [k for k, v in {
+        "LDAP URL": s.ldap_url, "Bind DN": s.ldap_bind_dn,
+        "User base DN": s.ldap_user_base_dn,
+    }.items() if not (v or "").strip()]
+    if missing:
+        add(False, "Configuration", f"missing: {', '.join(missing)} — set and Save above")
+        return checks
+    add(True, "Configuration", f"{s.ldap_url} · base {s.ldap_user_base_dn}")
+
+    server = ldap3.Server(
+        s.ldap_url, use_ssl=s.ldap_url.lower().startswith("ldaps"),
+        get_info=ldap3.NONE, connect_timeout=5,
+    )
+    try:
+        svc = ldap3.Connection(
+            server, s.ldap_bind_dn, s.ldap_bind_password,
+            auto_bind=True, receive_timeout=8,
+        )
+    except LDAPException as exc:
+        add(False, "Service-account bind", f"{type(exc).__name__}: {exc}")
+        return checks
+    add(True, "Service-account bind", f"bound as {s.ldap_bind_dn}")
+
+    if not (test_username or "").strip():
+        add(True, "User lookup", "enter a test username to check the search filter")
+        svc.unbind()
+        return checks
+
+    flt = s.ldap_user_filter.format(
+        username=escape_filter_chars(test_username.strip())
+    )
+    try:
+        svc.search(s.ldap_user_base_dn, flt,
+                   attributes=["displayName", "mail", "memberOf"])
+    except LDAPException as exc:
+        add(False, "User lookup", f"search failed: {exc}")
+        svc.unbind()
+        return checks
+    if not svc.entries:
+        add(False, "User lookup", f"no match for filter {flt} under {s.ldap_user_base_dn}")
+        svc.unbind()
+        return checks
+    entry = svc.entries[0]
+    user_dn = entry.entry_dn
+    groups = [str(g) for g in entry.memberOf] if "memberOf" in entry else []
+    add(True, "User lookup", f"{user_dn} · {len(groups)} group(s)")
+
+    if s.ldap_required_group:
+        in_group = s.ldap_required_group in groups
+        add(in_group, "Required group",
+            s.ldap_required_group if in_group
+            else f"user is NOT in {s.ldap_required_group}")
+    svc.unbind()
+
+    if test_password:
+        try:
+            uc = ldap3.Connection(server, user_dn, test_password,
+                                  auto_bind=True, receive_timeout=8)
+            uc.unbind()
+            add(True, "User bind (password check)", "credentials accepted")
+        except LDAPException as exc:
+            add(False, "User bind (password check)", f"{type(exc).__name__}: {exc}")
+    else:
+        add(True, "User bind", "no test password supplied — lookup only")
+    return checks
 
 
 # ---------------------------------------------------------------------------

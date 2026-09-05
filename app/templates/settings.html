@@ -181,5 +181,39 @@
     {% endfor %}
   </div>
   </form>
+
+  <div class="card">
+    <div class="card-head">
+      <h2>Active Directory test</h2>
+      <span class="subhead">step-by-step check of the saved LDAP settings above —
+        Save first. Read-only against the directory; a test password is used for
+        one bind and never stored.</span>
+    </div>
+
+    {% if ldap_test %}
+    <div class="readonly" style="border-color:var(--hairline)">
+      <div class="readonly-head"><span>LDAP result</span></div>
+      {% for r in ldap_test %}
+      <div class="readonly-body" style="display:flex;gap:8px;align-items:center">
+        <span class="pill {{ 'current' if r.ok else 'eol' }}">{{ 'ok' if r.ok else 'fail' }}</span>
+        <span style="font-weight:600">{{ r.check }}</span>
+        <span class="mono" style="font-size:11.5px;color:var(--ink-2)">{{ r.detail }}</span>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <form method="post" action="/settings/ldap/test" class="cube-add">
+      <input class="filter-select" type="text" name="test_username"
+             placeholder="test username (e.g. jsmith)" style="min-width:220px">
+      <input class="filter-select" type="password" name="test_password"
+             placeholder="test password (optional)" autocomplete="new-password" style="min-width:200px">
+      <button class="btn btn-primary" type="submit">Test Active Directory</button>
+    </form>
+    <div class="footnote"><span>Without a password: service bind + user lookup +
+      group check. With one: also verifies the credentials with a single bind.
+      Local accounts always keep working as <strong>break-glass</strong>, even
+      with auth backend set to ldap — an AD outage can never lock every admin out.</span></div>
+  </div>
 </div>
 {% endblock %}
