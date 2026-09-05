@@ -82,6 +82,14 @@ user:
 check:
 	python scripts/test_cucm.py
 
+# Fixture-based unit tests for the risky parsers (CDR/CMR, catalog, MOS,
+# phone-web) and auth. Self-contained: runs in a throwaway container with the
+# app deps + pytest, so it needs neither a venv nor the dev stack running.
+# No database or CUCM required. This is what CI runs, too.
+test:
+	docker run --rm -v $(PWD):/src -w /src python:3.12-slim \
+	  sh -c "pip install -q -r requirements.txt -r requirements-dev.txt && python -m pytest"
+
 # --- Containerized local dev (Docker on this machine) -----------------------
 DEV := docker compose -f docker-compose.dev.yml
 

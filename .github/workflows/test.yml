@@ -1,0 +1,24 @@
+name: tests
+
+# Run the fixture-based unit tests on every push and PR. They cover the parsing
+# most exposed to CUCM version drift (CDR/CMR, catalog, MOS, phone-web) plus the
+# auth chain, and need no database or CUCM — pure functions and file fixtures.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install dependencies
+        run: pip install -r requirements.txt -r requirements-dev.txt
+      - name: Run tests
+        run: python -m pytest
