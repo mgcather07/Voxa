@@ -68,13 +68,34 @@
   .nav-cta{margin-left:auto;display:flex;gap:12px;align-items:center}
   .btn{font-family:var(--sans);font-size:14px;font-weight:600;border-radius:8px;
     padding:10px 16px;cursor:pointer;border:1px solid transparent;display:inline-flex;
-    align-items:center;gap:8px;transition:transform .12s ease,background .15s ease,border-color .15s}
+    align-items:center;gap:8px;white-space:nowrap;
+    transition:transform .12s ease,background .15s ease,border-color .15s}
   .btn:hover{transform:translateY(-1px)}
   .btn-primary{background:var(--cyan);color:#05252A;font-weight:700}
   .btn-primary:hover{background:#4ee0f2}
   .btn-ghost{background:transparent;color:var(--ink);border-color:var(--hair)}
   .btn-ghost:hover{border-color:var(--cyan);color:var(--cyan)}
-  @media (max-width:760px){.nav-links{display:none}}
+  /* Mobile nav: keep Docs + Pricing reachable, drop the secondary button and
+     the long links instead of hiding all navigation. */
+  @media (max-width:760px){
+    .nav-in{gap:14px}
+    .nav-links{gap:16px;margin-left:0;font-size:13px}
+    .nav-links a.xm{display:none}
+    .nav-cta{gap:8px}
+    .nav-cta .btn-ghost{display:none}
+    .btn{padding:9px 13px;font-size:13px}
+  }
+  /* Small phones: tighter gutters, and the inventory table drops the Site
+     column so device names stay whole. */
+  .hero-grid > *, .band-in > *{min-width:0}
+  @media (max-width:480px){
+    .wrap{padding:0 20px}
+    .hero{padding:52px 0 30px}
+    .trow{grid-template-columns:1.5fr 58px 46px;font-size:11px}
+    .trow .site{display:none}
+    .tile .v{font-size:19px}
+    .final{padding:40px 20px}
+  }
 
   /* ---- hero ---- */
   .hero{padding:74px 0 40px}
@@ -237,10 +258,10 @@
     <div class="wrap nav-in">
       <div class="brand"><span class="mark"><i></i><i></i><i></i><i></i></span>Voxa</div>
       <div class="nav-links">
-        <a href="#features">Platform</a>
-        <a href="#how">How it works</a>
+        <a class="xm" href="#features">Platform</a>
+        <a class="xm" href="#how">How it works</a>
         <a href="#pricing">Pricing</a>
-        <a href="#trust">Security</a>
+        <a class="xm" href="#trust">Security</a>
         <a href="/docs/">Docs</a>
       </div>
       <div class="nav-cta">
@@ -285,7 +306,7 @@
             <div class="tile"><div class="k">Registered</div><div class="v" style="color:var(--green)">96%</div><div class="s">live via RisPort</div></div>
           </div>
           <div class="tbl">
-            <div class="trow"><span>Device</span><span>Site</span><span>Model</span><span style="text-align:right">Life</span></div>
+            <div class="trow"><span>Device</span><span class="site">Site</span><span>Model</span><span style="text-align:right">Life</span></div>
             <div class="trow"><span class="dev">SEP001122334455</span><span class="site">HQ · IDF-3</span><span class="mono" style="color:var(--ink-2)">8811</span><span class="pill cur">CUR</span></div>
             <div class="trow"><span class="dev">SEP00AABBCCDDEE</span><span class="site">HQ · IDF-1</span><span class="mono" style="color:var(--ink-2)">7841</span><span class="pill cur">CUR</span></div>
             <div class="trow"><span class="dev">SEP0026CB3B0A67</span><span class="site">Plant · MDF</span><span class="mono" style="color:var(--ink-2)">7962</span><span class="pill eos">EOS</span></div>

@@ -102,6 +102,29 @@
   .kbd-path{font-family:var(--mono);font-size:.86em;color:var(--ink);background:var(--inset);
     border:1px solid var(--hair-2);border-radius:5px;padding:1.5px 7px}
 
+  /* Mobile: the sidebar is hidden below 920px, so a collapsible "On this page"
+     TOC keeps every section reachable; the top bar sheds its long links so the
+     page never scrolls sideways. */
+  .mobile-toc{display:none;margin:30px 0 -6px;border:1px solid var(--hair);
+    border-radius:10px;background:var(--panel)}
+  @media (max-width:920px){.mobile-toc{display:block}}
+  .mobile-toc summary{cursor:pointer;padding:12px 16px;font-family:var(--mono);
+    font-size:11.5px;letter-spacing:.11em;text-transform:uppercase;color:var(--cyan);
+    list-style:none}
+  .mobile-toc summary::-webkit-details-marker{display:none}
+  .mobile-toc summary:after{content:"+";float:right;font-size:14px;color:var(--ink-3)}
+  .mobile-toc[open] summary:after{content:"−"}
+  .mobile-toc .mt-links{display:grid;grid-template-columns:1fr 1fr;gap:2px 18px;
+    padding:2px 16px 14px;font-size:13.5px}
+  .mobile-toc .mt-links a{color:var(--ink-2);padding:3px 0}
+  @media (max-width:640px){
+    .top-in{gap:12px;padding:0 18px}
+    .top-right{gap:12px}
+    .top-right a.xm{display:none}
+    .shell{padding:0 18px}
+  }
+  @media (max-width:420px){.top-label{display:none}}
+
   footer{border-top:1px solid var(--hair-2);padding:30px 24px 46px;color:var(--ink-3);font-size:13px}
   .foot-in{max-width:1240px;margin:0 auto;display:flex;justify-content:space-between;flex-wrap:wrap;gap:14px}
 </style>
@@ -113,8 +136,8 @@
     <a class="brand" href="/"><span class="mark"><i></i><i></i><i></i><i></i></span>Voxa</a>
     <span class="top-label">Documentation</span>
     <div class="top-right">
-      <a href="/#features">Platform</a>
-      <a href="/#pricing">Pricing</a>
+      <a class="xm" href="/#features">Platform</a>
+      <a class="xm" href="/#pricing">Pricing</a>
       <a href="/#demo">Request a demo</a>
     </div>
   </div>
@@ -151,6 +174,31 @@
   </nav>
 
   <main>
+    <details class="mobile-toc">
+      <summary>On this page</summary>
+      <div class="mt-links">
+        <a href="#overview">What Voxa is</a>
+        <a href="#architecture">Architecture</a>
+        <a href="#requirements">Requirements</a>
+        <a href="#install">Installation</a>
+        <a href="#cucm-account">CUCM service account</a>
+        <a href="#connect-cluster">Connecting a cluster</a>
+        <a href="#collections">Collections</a>
+        <a href="#inventory">Inventory &amp; dashboard</a>
+        <a href="#refresh">Refresh plan &amp; PoE</a>
+        <a href="#telemetry">Call telemetry</a>
+        <a href="#mos">MOS quality scoring</a>
+        <a href="#certificates">Certificates &amp; CUBEs</a>
+        <a href="#reports">Reports &amp; export</a>
+        <a href="#signin">Active Directory</a>
+        <a href="#users">Users &amp; roles</a>
+        <a href="#backup">Backups &amp; upgrades</a>
+        <a href="#api">JSON API</a>
+        <a href="#security">Security model</a>
+        <a href="#troubleshooting">Troubleshooting</a>
+        <a href="#faq">FAQ</a>
+      </div>
+    </details>
     <article class="doc">
 
       <h1 id="overview">Voxa Documentation</h1>
